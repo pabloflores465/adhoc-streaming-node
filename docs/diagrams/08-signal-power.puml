@@ -1,0 +1,91 @@
+@startuml Signal Power & Link Budget
+!theme plain
+skinparam backgroundColor #FEFEFE
+
+title Presupuesto de Enlace — Potencia, Pérdida y Sensibilidad
+
+package "Transmisor (Master)" #E8F5E9 {
+    [Tx Power] as txpwr
+    note right of txpwr
+      **P_tx típico laptop:**
+      15 dBm (≈ 30 mW)
+      Modo IBSS / 2.4GHz
+    end note
+    
+    [Antena Omni\n2 dBi] as antTx
+    
+    txpwr -> antTx : +2 dBi
+}
+
+package "Medio (Aire libre / Aula)" #FFF8E1 {
+    [Pérdida de espacio libre\nFSPL] as fspl
+    note right of fspl
+      **FSPL @ 2.4GHz:**
+      - 1m:  40 dB
+      - 5m:  54 dB
+      - 10m: 60 dB
+      - 20m: 66 dB
+      - 50m: 74 dB
+      
+      **Obstáculos (paredes):**
+      +3–10 dB por pared
+    end note
+    
+    [Margen de fading\n~10 dB] as fading
+}
+
+package "Receptor (Cliente)" #E3F2FD {
+    [Antena Omni\n2 dBi] as antRx
+    
+    [Rx Sensibilidad] as rxsen
+    note right of rxsen
+      **Sensibilidad típica:**
+      - 802.11g @ 54 Mbps: -72 dBm
+      - 802.11n @ MCS7:    -69 dBm
+      - Umbral IBSS usable: ~-75 dBm
+    end note
+    
+    [SNR mínimo\n10 dB] as snr
+}
+
+antTx -> fspl
+fspl -> fading
+fading -> antRx : +2 dBi
+antRx -> rxsen
+
+' --- Cálculo de ejemplo ---
+package "Ejemplo: 10 metros línea vista" #F3E5F5 {
+    [P_tx = 15 dBm] as ex1
+    [G_tx = +2 dBi] as ex2
+    [FSPL(10m) = -60 dB] as ex3
+    [Fading = -10 dB] as ex4
+    [G_rx = +2 dBi] as ex5
+    [P_rx = -51 dBm] as ex6
+    [Margen sobre sensibilidad: 21 dB] as ex7
+    
+    ex1 -> ex2
+    ex2 -> ex3
+    ex3 -> ex4
+    ex4 -> ex5
+    ex5 -> ex6
+    ex6 -> ex7
+}
+
+package "Ejemplo: 20 metros + 1 pared" #FFEBEE {
+    [P_rx = -66 - 6 = -72 dBm] as ex8
+    [Margen: 3 dB] as ex9
+    [Riesgo: pérdida de enlace] as ex10
+    
+    ex8 -> ex9
+    ex9 -> ex10
+}
+
+note bottom of ex10
+  <b>Decisión del sistema:</b>
+  Si RSSI < -70 dBm durante >15s,
+  el nodo considera al peer muerto,
+  limpia la tabla y potencialmente
+  migra a otra celda o crea una nueva.
+end note
+
+@enduml

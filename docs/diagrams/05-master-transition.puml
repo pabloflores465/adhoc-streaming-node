@@ -1,0 +1,61 @@
+@startuml Master Transition
+!theme plain
+skinparam backgroundColor #FEFEFE
+
+title Transición de Master con Pausa Automática
+
+participant "Master A" as ma
+participant "Cliente 1" as c1
+participant "Cliente 2" as c2
+participant "Master B\n(nuevo)" as mb
+
+== Estado estable ==
+ma -> c1 : multicast: "song_A.mp3"
+ma -> c2 : multicast: "song_A.mp3"
+ma -> c1 : heartbeat is_master=true
+ma -> c2 : heartbeat is_master=true
+
+== Master A pierde cobertura ==
+ma -x c1 : señal perdida
+ma -x c2 : señal perdida
+c1 -> c1 : timeout >15s
+c2 -> c2 : timeout >15s
+c1 -> c1 : limpiar peers
+c2 -> c2 : limpiar peers
+
+c1 -> c1 : am_i_master()? → True
+c2 -> c2 : am_i_master()? → True
+
+== Conflicto temporal (split-brain) ==
+mb -> mb : detecta 0 peers → Master
+c1 -> c1 : detecta 0 peers → Master
+c2 -> c2 : detecta 0 peers → Master
+
+mb -> mb : sniff_multicast() → False
+mb -> mb : _pick_and_stream() → "song_B.mp3"
+mb -> c1 : multicast: "song_B.mp3"
+mb -> c2 : multicast: "song_B.mp3"
+
+alt Cliente detecta canción diferente
+    c1 -> c1 : previous="song_A", current="song_B"
+    c1 -> c1 : PAUSA automática
+    c2 -> c2 : PAUSA automática
+end
+
+== Reconexión con pausa ==
+mb -> c1 : heartbeat is_master=true + song="song_B.mp3"
+c1 -> c1 : cliente en PAUSA, no reproduce
+
+c1 -> mb : POST /api/toggle-pause (usuario)
+mb --> c1 : ok paused=false
+c1 -> c1 : Reanudar mpv cliente
+
+c2 -> mb : POST /api/toggle-pause (usuario)
+mb --> c2 : ok paused=false
+c2 -> c2 : Reanudar mpv cliente
+
+== Estado final ==
+mb -> c1 : multicast: "song_B.mp3"
+mb -> c2 : multicast: "song_B.mp3"
+
+@enduml

@@ -1,0 +1,64 @@
+---
+- name: Desplegar nodo AD-HOC Streaming
+  hosts: adhoc_nodes
+  become: yes
+  vars:
+    repo_dest: /opt/adhoc-node/repo
+  tasks:
+    - name: Instalar dependencias
+      apt:
+        name:
+          - iw
+          - wireless-tools
+          - wpasupplicant
+          - python3
+          - python3-pip
+          - python3-venv
+          - ffmpeg
+          - mpv
+          - iperf3
+        state: present
+        update_cache: yes
+
+    - name: Crear directorios
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - /opt/adhoc-node
+        - /opt/adhoc-node/music
+        - /opt/adhoc-node/logs
+        - "{{ repo_dest }}"
+
+    - name: Sincronizar repositorio
+      synchronize:
+        src: "../"
+        dest: "{{ repo_dest }}"
+        rsync_opts:
+          - "--exclude=.git"
+          - "--exclude=docs/figures"
+
+    - name: Crear virtualenv e instalar Python deps
+      pip:
+        requirements: "{{ repo_dest }}/src/requirements.txt"
+        virtualenv: /opt/adhoc-node/venv
+        virtualenv_command: python3 -m venv
+
+    - name: Copiar servicios systemd
+      copy:
+        src: "{{ repo_dest }}/systemd/adhoc-node.service"
+        dest: /etc/systemd/system/adhoc-node.service
+        remote_src: yes
+      notify: daemon_reload
+
+    - name: Habilitar y arrancar servicio
+      systemd:
+        name: adhoc-node
+        enabled: yes
+        state: started
+
+  handlers:
+    - name: daemon_reload
+      systemd:
+        daemon_reload: yes

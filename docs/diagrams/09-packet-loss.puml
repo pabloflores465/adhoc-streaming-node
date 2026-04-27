@@ -1,0 +1,82 @@
+@startuml Packet Loss & Recovery States
+!theme plain
+skinparam backgroundColor #FEFEFE
+
+title Estados de Pérdida de Paquetes y Recuperación del Cliente
+
+[*] --> Reproduciendo
+
+state "Reproduciendo" as playing {
+    [*] --> BufferOK
+    BufferOK : mpv recibe UDP
+    BufferOK : sin gaps detectados
+    
+    BufferOK --> Underrun : pérdida de paquetes
+    Underrun : buffer vacío
+    Underrun : < 100ms de audio
+    
+    Underrun --> BufferOK : paquetes recuperados
+}
+
+playing --> Pausa : usuario presiona Pausa
+Pausa : pausado = True
+Pausa : mpv detenido
+Pausa : no reintentar reconexión
+
+Pausa --> Reconectando : usuario presiona Play
+
+playing --> Reconectando : EOF inesperado
+playing --> Reconectando : timeout >15s sin heartbeat
+
+state "Reconectando" as recon {
+    [*] --> EsperarHeartbeat
+    EsperarHeartbeat : cleanup peers
+    EsperarHeartbeat : evaluar am_i_master()
+    
+    EsperarHeartbeat --> NuevoMaster : detecta nuevo Master
+    EsperarHeartbeat --> AutoMaster : 0 peers → soy Master
+    
+    NuevoMaster --> [*]
+    AutoMaster --> [*]
+}
+
+Reconectando --> playing : reiniciar mpv cliente
+Reconectando --> Sniffing : si soy candidato a Master
+
+state "Sniffing" as sniff {
+    [*] --> sniffMulticast
+    sniffMulticast : escuchar UDP 239.255.42.42:5004
+    sniffMulticast : durante 2 segundos
+    
+    sniffMulticast --> Rendirse : stream detectado + otro Master mejor score
+    sniffMulticast --> TomarControl : silencio o yo tengo mejor score
+    
+    Rendirse --> [*]
+    TomarControl --> [*]
+}
+
+Sniffing --> Reconectando : Rendirse (modo cliente)
+Sniffing --> playing : TomarControl (iniciar ffmpeg)
+
+Pausa --> [*] : shutdown
+playing --> [*] : shutdown
+Reconectando --> [*] : shutdown
+
+note right of playing
+  <b>Métricas mostradas en dashboard:</b>
+  - Tasa TX actual (iw station dump)
+  - Señal por peer (dBm)
+  - Modulación inferida
+  - Número de peers activos
+end note
+
+note right of recon
+  <b>Tiempos:</b>
+  - Heartbeat cada 3s
+  - Peer timeout: 15s
+  - Rejoin scan: 60s
+  - Sniff previo: 2s
+  - Gap estimado: 5–20s
+end note
+
+@enduml

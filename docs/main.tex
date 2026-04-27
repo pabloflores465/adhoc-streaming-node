@@ -1,0 +1,37 @@
+\documentclass[12pt,a4paper]{report}
+\usepackage[utf8]{inputenc}
+\usepackage[spanish]{babel}
+\usepackage{graphicx}
+\usepackage{geometry}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{caption}
+\usepackage{booktabs}
+
+\geometry{margin=2.5cm}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue},
+  commentstyle=\color{gray},
+  stringstyle=\color{orange},
+  breaklines=true
+}
+
+\title{\textbf{Red AD-HOC Inalámbrica}\\Transmisión de Streaming en Tiempo Real}
+\author{[Nombre del alumno]}
+\date{\today}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+\input{sections/introduccion}
+\input{sections/arquitectura}
+\input{sections/implementacion}
+\input{sections/pruebas}
+\input{sections/conclusiones}
+
+\end{document}

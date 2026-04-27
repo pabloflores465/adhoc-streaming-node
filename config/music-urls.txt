@@ -1,0 +1,12 @@
+# music-urls.txt — URLs directas a archivos MP3/OGG de música Creative Commons.
+# Líneas que empiezan con # se ignoran.
+#
+# Ejemplos de fuentes conocidas (verificar disponibilidad antes del examen):
+# https://files.freemusicarchive.org/storage-freemusicarchive-org/music/ccCommunity/...
+#
+# Para usar yt-dlp en su lugar, define la variable de entorno:
+#   YTDLP_PLAYLIST="https://www.youtube.com/playlist?list=XXXXXX"
+# y asegúrate de que la playlist contenga música Creative Commons.
+#
+# Si este archivo está vacío o todas las URLs fallan, el script genera
+# pistas de prueba automáticamente con ffmpeg.

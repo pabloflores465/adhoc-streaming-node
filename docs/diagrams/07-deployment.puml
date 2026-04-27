@@ -1,0 +1,54 @@
+@startuml Deployment
+!theme plain
+skinparam backgroundColor #FEFEFE
+
+title Diagrama de Despliegue Físico — USB Boot + Red AD-HOC
+
+node "Laptop Alumno 1" as lap1 {
+    artifact "USB Ubuntu 22.04" as usb1
+    component "adhoc-node.service" as svc1
+    portin "wlan0" as wifi1
+}
+
+node "Laptop Alumno 2" as lap2 {
+    artifact "USB Ubuntu 22.04" as usb2
+    component "adhoc-node.service" as svc2
+    portin "wlan0" as wifi2
+}
+
+node "Laptop Alumno N" as lapN {
+    artifact "USB Ubuntu 22.04" as usbN
+    component "adhoc-node.service" as svcN
+    portin "wlan0" as wifiN
+}
+
+node "Router Inalámbrico\n(NO usado)" as router #FFEBEE {
+    portin "AP" as ap
+}
+
+cloud "IBSS AD-HOC\nSSID: ADHOC-STREAM" as adhoc
+
+lap1 --> usb1 : boot
+usb1 --> svc1 : systemd
+svc1 --> wifi1 : iw dev wlan0 ibss join
+
+lap2 --> usb2 : boot
+usb2 --> svc2 : systemd
+svc2 --> wifi2 : iw dev wlan0 ibss join
+
+lapN --> usbN : boot
+usbN --> svcN : systemd
+svcN --> wifiN : iw dev wlan0 ibss join
+
+wifi1 --> adhoc : 2.4GHz IBSS
+wifi2 --> adhoc : 2.4GHz IBSS
+wifiN --> adhoc : 2.4GHz IBSS
+
+note right of router
+  <b>Nota:</b> No hay infraestructura.
+  La red es puramente ad-hoc.
+  Cada nodo habla directamente
+  con los nodos en rango.
+end note
+
+@enduml

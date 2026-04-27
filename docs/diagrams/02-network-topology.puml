@@ -1,0 +1,62 @@
+@startuml Network Topology
+!theme plain
+skinparam backgroundColor #FEFEFE
+
+title Topología de Red AD-HOC IBSS — Particiones y Re-fusión
+
+package "Celda A (Master A)" #E8F5E9 {
+    node "Master A\n192.168.99.10" as ma {
+        [ffmpeg stream] as fa
+    }
+    node "Cliente 1\n192.168.99.11" as c1
+    node "Cliente 2\n192.168.99.12" as c2
+    
+    ma -[bold]-> c1 : UDP multicast\nstreaming
+    ma -[bold]-> c2 : UDP multicast\nstreaming
+    c1 .[dashed].> ma : heartbeat
+    c2 .[dashed].> ma : heartbeat
+}
+
+package "Celda B (Master B)\n>10m de distancia" #FFF3E0 {
+    node "Master B\n192.168.99.20" as mb {
+        [ffmpeg stream] as fb
+    }
+    node "Cliente 3\n192.168.99.21" as c3
+    
+    mb -[bold]-> c3 : UDP multicast
+    c3 .[dashed].> mb : heartbeat
+}
+
+package "Celda C (aislado)\n>20m de distancia" #FFEBEE {
+    node "Nodo aislado\n192.168.99.30" as na {
+        [ffmpeg stream] as fc
+    }
+    note right of na
+        Sin peers detectados
+        tras 15s timeout
+        → auto-promueve a Master
+    end note
+}
+
+' Transiciones
+ma -[hidden]down-> mb
+mb -[hidden]down-> na
+
+note bottom of ma
+  <b>Escaneo IBSS:</b>
+  1. Escanear SSID "ADHOC-STREAM"
+  2. Si cell_id conocido → re-unirse
+  3. Si mejor señal en otra celda → migrar
+  4. Si ninguna → crear nueva celda
+end note
+
+note right of c3
+  <b>Re-fusión:</b>
+  Cuando Celda A y B
+  se acercan físicamente,
+  802.11 IBSS las fusiona.
+  El Master con menor score
+  se rinde por heartbeat.
+end note
+
+@enduml

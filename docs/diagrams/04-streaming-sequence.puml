@@ -1,0 +1,49 @@
+@startuml Streaming Sequence
+!theme plain
+skinparam backgroundColor #FEFEFE
+
+title Secuencia de Streaming — Master Relay desde Peer Remoto
+
+participant "Usuario" as user
+participant "Master\n(nodo X)" as master
+participant "Peer A\n(nodo Y)" as peer
+participant "Cliente 1" as c1
+participant "Cliente 2" as c2
+
+== Heartbeat continuo ==
+peer -> master : heartbeat + songs=["song_01.mp3"]
+master -> master : Inventario global
+
+== Usuario fuerza canción remota ==
+user -> master : POST /api/force-song?song=song_01.mp3
+master -> master : _resolve_song("song_01.mp3")
+master -> master : Encontrado en Peer A
+
+alt sniff_multicast() = False
+    master -> master : Tomar control multicast
+else sniff_multicast() = True
+    master -> master : Comparar scores
+    master -> master : Si otro Master mejor → rendirse
+end
+
+master -> peer : HTTP GET /music/song_01.mp3
+peer --> master : stream MP3 (binary)
+
+master -> master : ffmpeg relay
+master -> c1 : UDP multicast MPEG-TS
+master -> c2 : UDP multicast MPEG-TS
+
+c1 -> c1 : mpv --no-cache (reproducir)
+c2 -> c2 : mpv --no-cache (reproducir)
+
+== Heartbeat con is_master=True ==
+master -> c1 : heartbeat + is_master=true
+master -> c2 : heartbeat + is_master=true
+master -> peer : heartbeat + is_master=true
+
+== EOF de canción ==
+master -> master : ffmpeg termina
+master -> master : _on_stream_eof()
+master -> master : _pick_and_stream() (siguiente)
+
+@enduml

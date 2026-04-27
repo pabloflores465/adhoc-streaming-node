@@ -1,0 +1,86 @@
+@startuml Class Diagram
+!theme plain
+skinparam backgroundColor #FEFEFE
+
+title Diagrama de Clases — Código Python
+
+class NodeDaemon {
+  + is_master: bool
+  + paused: bool
+  + current_song: str
+  + forced_song: str | None
+  + run()
+  - _heartbeat_loop()
+  - _master_logic()
+  - _pick_and_stream()
+  - _another_master_with_higher_score()
+  - _resolve_song(name)
+  - toggle_pause() → bool
+}
+
+class AdhocManager {
+  + peers: dict
+  + port: int
+  + send_heartbeat(is_master)
+  + send_song_request(name)
+  + send_ip_reassign(target, ip)
+  + detect_ip_conflicts() → list
+  + pick_free_ip() → str
+  - receiver_loop()
+  - _change_ip(new_ip)
+}
+
+class Streamer {
+  + current_song: str
+  + start_server(path)
+  + start_server_from_url(url, name)
+  + start_client()
+  + stop()
+  + is_running() → bool
+  + {static} sniff_multicast(timeout) → bool
+  - _watchdog()
+}
+
+class Monitor {
+  + {static} get_station_dump() → list
+  + {static} get_tx_rate() → str
+  + {static} get_signal_levels() → dict
+  + {static} get_modulation() → str
+  + {static} get_local_songs() → list
+  + {static} build_status(master, song, peers) → dict
+}
+
+class WebApp {
+  + _daemon_state: dict
+  + dashboard() → HTML
+  + api_status() → JSON
+  + api_force_song() → JSON
+  + api_force_master() → JSON
+  + api_toggle_pause() → JSON
+  + serve_music(filename) → file
+}
+
+class State {
+  + {static} save(state) → bool
+  + {static} load() → dict | None
+  + {static} clear() → bool
+}
+
+NodeDaemon "1" --> "1" AdhocManager : net
+NodeDaemon "1" --> "1" Streamer : streamer
+NodeDaemon "1" --> "1" State : state
+WebApp --> NodeDaemon : inyecta callbacks
+Monitor ..> NodeDaemon : get_status()
+
+note right of NodeDaemon
+  Hilos internos:
+  - heartbeat_loop
+  - cleanup_loop  
+  - ip_conflict_loop
+  - state_persist_loop
+  - rejoin_loop
+  - master_logic
+  - web_server
+end note
+
+@enduml

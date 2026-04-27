@@ -1,0 +1,24 @@
+[Unit]
+Description=AD-HOC Streaming Node Daemon
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+ExecStart=/opt/adhoc-node/repo/scripts/init-node.sh
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=adhoc-node
+Environment="ADHOC_IFACE=wlan0"
+Environment="ADHOC_SSID=ADHOC-STREAM"
+Environment="ADHOC_FREQ=2412"
+Environment="ADHOC_NET=192.168.99"
+Environment="ADHOC_MULTI=239.255.42.42"
+Environment="ADHOC_PORT=5004"
+Environment="ADHOC_PLAYER=mpv"
+Environment="PYTHONUNBUFFERED=1"
+
+[Install]
+WantedBy=multi-user.target

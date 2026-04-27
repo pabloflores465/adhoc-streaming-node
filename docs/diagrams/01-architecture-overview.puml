@@ -1,0 +1,86 @@
+@startuml Architecture Overview
+!theme plain
+skinparam componentStyle rectangle
+skinparam backgroundColor #FEFEFE
+
+title Visión Holística — Arquitectura AD-HOC Streaming Node
+
+package "Nodo Individual" {
+    [systemd\nadhoc-node.service] as systemd
+    [init-node.sh] as init
+    [network-setup.sh] as netsetup
+    [network-rejoin.sh] as rejoin
+    [master-election.sh] as masterel
+    
+    package "Daemon Python" {
+        [node-daemon.py] as daemon
+        [AdhocManager] as adhoc
+        [Streamer] as streamer
+        [Monitor] as monitor
+        [Flask Web] as flask
+        [State Persist] as state
+    }
+    
+    [ffmpeg] as ffmpeg
+    [mpv/ffplay] as player
+    
+    folder "Music" {
+        [25 canciones\n≤90s] as music
+    }
+}
+
+package "Red AD-HOC" {
+    cloud "IBSS Cell A\n(cell_id: 02:xx:...:01)" as cellA
+    cloud "IBSS Cell B\n(cell_id: 02:xx:...:02)" as cellB
+    
+    [Master A] as ma
+    [Cliente 1] as c1
+    [Cliente 2] as c2
+    
+    [Master B] as mb
+    [Cliente 3] as c3
+}
+
+cloud "Internet (opcional)" as inet
+
+' --- Flujos internos ---
+systemd --> init
+init --> netsetup
+init --> masterel
+init --> daemon
+daemon --> adhoc
+daemon --> streamer
+daemon --> monitor
+daemon --> flask
+daemon --> state
+daemon --> rejoin
+
+streamer --> ffmpeg : Master
+streamer --> player : Cliente
+flask --> music : HTTP /music/
+
+' --- Red ---
+adhoc ..> cellA : heartbeat UDP
+adhoc ..> cellB : heartbeat UDP
+ffmpeg ..> cellA : multicast UDP\n239.255.42.42:5004
+player ..> cellA : multicast UDP
+
+ma -down-> cellA
+c1 -up-> cellA
+c2 -up-> cellA
+
+mb -down-> cellB
+c3 -up-> cellB
+
+' --- Descarga música ---
+music ..> inet : yt-dlp / wget CC
+
+legend right
+  | Color | Significado |
+  | <#LightBlue> | Proceso Python |
+  | <#LightGreen> | Script Shell |
+  | <#LightYellow> | Servicio systemd |
+  | <#LightCoral> | Hardware/Red |
+endlegend
+
+@enduml

@@ -1,0 +1,11 @@
+*.pyc
+__pycache__/
+*.log
+.env
+venv/
+*.pdf
+*.aux
+*.toc
+*.out
+*.fdb_latexmk
+*.fls

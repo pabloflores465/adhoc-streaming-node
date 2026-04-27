@@ -1,0 +1,71 @@
+@startuml Boot Sequence
+!theme plain
+skinparam backgroundColor #FEFEFE
+
+title Flujo de Arranque del Nodo (systemd → daemon)
+
+actor USB
+participant "systemd" as sys
+participant "init-node.sh" as init
+participant "network-setup.sh" as net
+participant "master-election.sh" as me
+participant "download-music.sh" as dm
+participant "node-daemon.py" as daemon
+participant "Flask :8080" as web
+
+database "state.json" as state
+database "/tmp/adhoc/" as tmp
+collections "Peers" as peers
+
+USB -> sys : boot desde USB
+sys -> init : exec adhoc-node.service
+
+init -> state : Leer estado previo
+alt Estado reciente (<5min)
+    state --> init : cell_id, is_master, last_song
+    init -> net : PREFERRED_CELL=cell_id
+else Sin estado o stale
+    init -> net : PREFERRED_CELL=""
+end
+
+net -> tmp : Configurar interfaz wlan0
+alt Celda preferida encontrada
+    net -> tmp : cell_id conocido
+    net -> tmp : IP fija (machine-id)
+else Sin redes en rango
+    net -> tmp : Generar cell_id aleatorio
+    net -> tmp : IP .1, master.flag
+end
+
+init -> me : Calcular score
+me -> tmp : Guardar my-score
+
+init -> dm : Verificar 25 canciones
+alt <25 canciones
+    dm -> dm : yt-dlp / wget / ffmpeg gen
+end
+
+init -> daemon : Exec daemon Python
+
+activate daemon
+
+daemon -> daemon : Hilo heartbeat
+daemon -> daemon : Hilo receiver
+daemon -> daemon : Hilo cleanup
+daemon -> daemon : Hilo IP conflicts
+daemon -> daemon : Hilo persist state
+daemon -> daemon : Hilo rejoin (60s)
+daemon -> daemon : Hilo master logic
+daemon -> web : Hilo Flask
+
+web --> peers : HTTP /music/<file>
+
+note right of daemon
+  <b>Hilos concurrentes:</b>
+  - Heartbeat cada 3s
+  - Cleanup peers cada 10s
+  - Reescaneo cada 60s
+  - Persistencia cada 5s
+end note
+
+@enduml
