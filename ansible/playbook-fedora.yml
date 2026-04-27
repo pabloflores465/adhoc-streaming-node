@@ -1,0 +1,107 @@
+---
+- name: Desplegar nodo AD-HOC Streaming en Fedora 43 KDE
+  hosts: adhoc_nodes
+  become: yes
+  vars:
+    repo_dest: /opt/adhoc-node/repo
+    adhoc_iface: "{{ ADHOC_IFACE | default('wlan0') }}"
+  tasks:
+    - name: Habilitar rpmfusion-free
+      dnf:
+        name: "https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-{{ ansible_distribution_major_version }}.noarch.rpm"
+        state: present
+        disable_gpg_check: yes
+
+    - name: Instalar dependencias
+      dnf:
+        name:
+          - iw
+          - wpa_supplicant
+          - python3
+          - python3-pip
+          - ffmpeg
+          - mpv
+          - iperf3
+          - rsync
+          - policycoreutils-python-utils
+        state: present
+        update_cache: yes
+
+    - name: Excluir interfaz Wi-Fi de NetworkManager
+      copy:
+        dest: "/etc/NetworkManager/conf.d/99-adhoc-unmanaged.conf"
+        content: |
+          [device-{{ adhoc_iface }}]
+          match-device=interface-name:{{ adhoc_iface }}
+          managed=false
+      notify: reload_networkmanager
+
+    - name: Crear directorios
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - /opt/adhoc-node
+        - /opt/adhoc-node/music
+        - /opt/adhoc-node/logs
+        - "{{ repo_dest }}"
+
+    - name: Sincronizar repositorio
+      synchronize:
+        src: "../"
+        dest: "{{ repo_dest }}"
+        rsync_opts:
+          - "--exclude=.git"
+          - "--exclude=docs/figures"
+
+    - name: Crear virtualenv e instalar Python deps
+      pip:
+        requirements: "{{ repo_dest }}/src/requirements.txt"
+        virtualenv: /opt/adhoc-node/venv
+        virtualenv_command: python3 -m venv
+
+    - name: Configurar SELinux context para /opt/adhoc-node
+      sefcontext:
+        target: '/opt/adhoc-node(/.*)?'
+        setype: usr_t
+        state: present
+      when: ansible_selinux.status == "enabled"
+
+    - name: Aplicar SELinux restorecon
+      command: restorecon -Rv /opt/adhoc-node
+      when: ansible_selinux.status == "enabled"
+
+    - name: Abrir puertos en firewalld
+      firewalld:
+        port: "{{ item }}"
+        permanent: yes
+        state: enabled
+        immediate: yes
+      loop:
+        - 8080/tcp
+        - 5004/udp
+        - 5005/udp
+
+    - name: Copiar servicios systemd
+      copy:
+        src: "{{ repo_dest }}/systemd/adhoc-node.service"
+        dest: /etc/systemd/system/adhoc-node.service
+        remote_src: yes
+      notify: daemon_reload
+
+    - name: Habilitar y arrancar servicio
+      systemd:
+        name: adhoc-node
+        enabled: yes
+        state: started
+
+  handlers:
+    - name: reload_networkmanager
+      systemd:
+        name: NetworkManager
+        state: reloaded
+
+    - name: daemon_reload
+      systemd:
+        daemon_reload: yes

@@ -64,10 +64,21 @@ Red AD-HOC inalámbrica para transmisión de streaming en tiempo real con GNU/Li
 
 ## Instalación Rápida
 
+### Ubuntu / Debian
+
 ```bash
 sudo ./scripts/install.sh
 sudo systemctl enable --now adhoc-node.service
 ```
+
+### Fedora 43 KDE (y otras ediciones)
+
+```bash
+sudo ./scripts/install-fedora.sh
+sudo systemctl enable --now adhoc-node.service
+```
+
+> **Nota Fedora:** El script habilita automáticamente `rpmfusion-free` (requerido para `ffmpeg` con `libmp3lame`), marca la interfaz Wi-Fi como **unmanaged** en NetworkManager, y abre los puertos necesarios en `firewalld`.
 
 ## Logs
 
@@ -87,10 +98,21 @@ sudo journalctl -u adhoc-node.service -f
 
 ## Requisitos
 
+### Ubuntu / Debian
 - Ubuntu 22.04/24.04 LTS en USB bootable
+- `apt-get` disponible
+
+### Fedora 43
+- Fedora 43 Workstation/KDE/Server en USB bootable
+- `dnf` (dnf5) disponible
+- NetworkManager (script lo configura como unmanaged para la interfaz IBSS)
+- SELinux enforcing (script aplica contextos automáticamente)
+- Firewalld (script abre puertos automáticamente)
+
+### Hardware común
 - Tarjeta Wi-Fi con modo IBSS/ad-hoc soportado
 - Python 3.10+
-- `iw`, `wpasupplicant`, `ffmpeg`, `vlc` o `mpv`
+- `iw`, `wpa_supplicant`, `ffmpeg`, `mpv`
 
 ## Licencia
 
