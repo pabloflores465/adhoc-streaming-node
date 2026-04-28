@@ -9,7 +9,18 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 INSTALL_ROOT="/opt/adhoc-node"
 VENV="$INSTALL_ROOT/venv"
-IFACE="${ADHOC_IFACE:-wlan0}"
+# Detectar interfaz inalámbrica automáticamente (no requiere iw instalado)
+IFACE="${ADHOC_IFACE:-}"
+if [ -z "$IFACE" ]; then
+    for _dev in /sys/class/net/*/wireless; do
+        [ -d "$_dev" ] && IFACE=$(basename "$(dirname "$_dev")") && break
+    done
+fi
+if [ -z "$IFACE" ]; then
+    echo "[!] No se detectó interfaz inalámbrica. Especifica: sudo ADHOC_IFACE=wlanX ./install-fedora.sh"
+    exit 1
+fi
+echo "[+] Interfaz inalámbrica detectada: $IFACE"
 
 # ─── 0. Detectar versión de Fedora ─────────────────────────────────────────
 FEDORA_VERSION=$(rpm -E %fedora)
@@ -66,7 +77,7 @@ python3 -m venv "$VENV"
 
 # ─── 5. Instalación del código ─────────────────────────────────────────────
 echo "[+] Instalando repositorio..."
-mkdir -p "$INSTALL_ROOT"/{repo,music,logs}
+mkdir -p "$INSTALL_ROOT"/{repo,music,logs,state}
 rsync -a --delete \
     --exclude='.git' \
     --exclude='docs/figures' \
@@ -80,6 +91,8 @@ bash "$INSTALL_ROOT/repo/scripts/download-music.sh" "$INSTALL_ROOT/music"
 # ─── 7. Servicios systemd ──────────────────────────────────────────────────
 echo "[+] Registrando servicios systemd..."
 cp "$INSTALL_ROOT/repo/systemd/"*.service /etc/systemd/system/
+# Actualizar la interfaz real en el servicio instalado
+sed -i "s/ADHOC_IFACE=wlan0/ADHOC_IFACE=${IFACE}/" /etc/systemd/system/adhoc-node.service
 systemctl daemon-reload
 systemctl enable adhoc-node.service
 
@@ -108,6 +121,7 @@ fi
 chmod -R 755 "$INSTALL_ROOT/repo/scripts/"*.sh
 touch "$INSTALL_ROOT/logs/daemon.log"
 touch "$INSTALL_ROOT/logs/network.log"
+touch "$INSTALL_ROOT/logs/node.log"
 
 echo ""
 echo "[+] Instalación completa en Fedora $FEDORA_VERSION."
