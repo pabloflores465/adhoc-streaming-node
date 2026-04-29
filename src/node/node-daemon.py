@@ -388,27 +388,33 @@ class NodeDaemon:
             except Exception:
                 self.logger.exception("Error en master logic loop")
 
+    def _web_loop(self):
+        """Arranca Flask y lo reinicia si se cae, con backoff."""
+        delay = 2
+        while True:
+            try:
+                self.logger.info("Iniciando servidor web en :8080")
+                webapp.run_web(host="0.0.0.0", port=8080)
+            except Exception:
+                self.logger.exception("Servidor web caído, reiniciando en %ds...", delay)
+            time.sleep(delay)
+            delay = min(delay * 2, 30)  # backoff hasta 30s máximo
+
     def run(self):
         self.logger.info("Nodo %s iniciando daemon...", NODE_ID)
         self.net.start()
 
-        t_hb = threading.Thread(target=self._heartbeat_loop, daemon=True)
-        t_clean = threading.Thread(target=self._cleanup_loop, daemon=True)
-        t_ipconf = threading.Thread(target=self._ip_conflict_loop, daemon=True)
-        t_state = threading.Thread(target=self._state_persist_loop, daemon=True)
-        t_rejoin = threading.Thread(target=self._rejoin_loop, daemon=True)
-        t_master = threading.Thread(target=self._master_logic, daemon=True)
-        t_web = threading.Thread(
-            target=lambda: webapp.run_web(host="0.0.0.0", port=8080), daemon=True
-        )
-
-        t_hb.start()
-        t_clean.start()
-        t_ipconf.start()
-        t_state.start()
-        t_rejoin.start()
-        t_master.start()
-        t_web.start()
+        threads = [
+            threading.Thread(target=self._heartbeat_loop,    daemon=True, name="heartbeat"),
+            threading.Thread(target=self._cleanup_loop,      daemon=True, name="cleanup"),
+            threading.Thread(target=self._ip_conflict_loop,  daemon=True, name="ip-conflict"),
+            threading.Thread(target=self._state_persist_loop,daemon=True, name="state-persist"),
+            threading.Thread(target=self._rejoin_loop,       daemon=True, name="rejoin"),
+            threading.Thread(target=self._master_logic,      daemon=True, name="master-logic"),
+            threading.Thread(target=self._web_loop,          daemon=True, name="web"),
+        ]
+        for t in threads:
+            t.start()
 
         while True:
             time.sleep(1)
