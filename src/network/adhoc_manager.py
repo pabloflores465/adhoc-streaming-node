@@ -37,17 +37,38 @@ class AdhocManager:
         self.extra_heartbeat_fn = extra_heartbeat_fn
         self.on_song_request_fn = on_song_request_fn
         self.port = port if port is not None else HEARTBEAT_PORT
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
-        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        try:
-            self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
-        except (AttributeError, OSError):
-            pass
-        self.sock.bind(("0.0.0.0", self.port))
+        self.sock: Optional[socket.socket] = None
+        self._bind_socket()
 
-        mreq = struct.pack("4sl", socket.inet_aton(MULTI_ADDR), socket.INADDR_ANY)
-        self.sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+    def _bind_socket(self):
+        """Crea y bindea el socket UDP. Reintenta si el puerto está ocupado."""
+        for attempt in range(5):
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+                try:
+                    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+                except (AttributeError, OSError):
+                    pass
+                sock.bind(("0.0.0.0", self.port))
+                try:
+                    mreq = struct.pack("4sl", socket.inet_aton(MULTI_ADDR), socket.INADDR_ANY)
+                    sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+                except OSError as e:
+                    logger.warning("Multicast join falló (no fatal): %s", e)
+                self.sock = sock
+                logger.info("Socket UDP bound en puerto %d", self.port)
+                return
+            except OSError as e:
+                logger.warning("Intento %d/5 bind puerto %d falló: %s", attempt + 1, self.port, e)
+                try:
+                    sock.close()
+                except Exception:
+                    pass
+                time.sleep(2)
+        logger.error("No se pudo bindear socket UDP en puerto %d. Heartbeats deshabilitados.", self.port)
+        self.sock = None
 
     def _my_score(self) -> int:
         try:
@@ -68,6 +89,8 @@ class AdhocManager:
         return "0.0.0.0"
 
     def send_heartbeat(self, is_master: bool = False):
+        if self.sock is None:
+            return
         msg = {
             "type": "heartbeat",
             "node_id": NODE_ID,
@@ -79,12 +102,33 @@ class AdhocManager:
         if self.extra_heartbeat_fn:
             msg.update(self.extra_heartbeat_fn())
         payload = json.dumps(msg).encode("utf-8")
-        self.sock.sendto(payload, (BROADCAST_ADDR, self.port))
-        self.sock.sendto(payload, (MULTI_ADDR, self.port))
+        try:
+            self.sock.sendto(payload, (BROADCAST_ADDR, self.port))
+            self.sock.sendto(payload, (MULTI_ADDR, self.port))
+        except OSError as e:
+            # ENETUNREACH (101) es normal cuando no hay carrier/peers todavía en IBSS
+            if e.errno == 101:
+                logger.debug("Heartbeat: sin carrier aún (IBSS sin peers)")
+            else:
+                logger.warning("Error enviando heartbeat: %s", e)
 
     def receiver_loop(self):
+        if self.sock is None:
+            logger.warning("Socket no disponible, receiver_loop deshabilitado.")
+            return
         self.sock.settimeout(2.0)
+        mc_joined = False
+        last_mc_retry = 0.0
         while True:
+            # Reintentar multicast join cada 10s hasta que el carrier suba
+            if not mc_joined and time.time() - last_mc_retry > 10:
+                try:
+                    mreq = struct.pack("4sl", socket.inet_aton(MULTI_ADDR), socket.INADDR_ANY)
+                    self.sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+                    mc_joined = True
+                    logger.info("Multicast join exitoso en %s", MULTI_ADDR)
+                except OSError:
+                    last_mc_retry = time.time()
             try:
                 data, addr = self.sock.recvfrom(2048)
                 msg = json.loads(data.decode("utf-8"))
@@ -96,6 +140,7 @@ class AdhocManager:
                             "ip": msg.get("ip", addr[0]),
                             "score": msg.get("score", 0),
                             "songs": msg.get("songs", []),
+                            "is_master": msg.get("is_master", False),
                             "last_seen": time.time(),
                         }
 
@@ -165,16 +210,23 @@ class AdhocManager:
         return f"{IP_PREFIX}.250"
 
     def send_ip_reassign(self, target_node_id: str, new_ip: str):
+        if self.sock is None:
+            return
         msg = {
             "type": "ip_reassign",
             "target_node_id": target_node_id,
             "new_ip": new_ip,
         }
         payload = json.dumps(msg).encode("utf-8")
-        self.sock.sendto(payload, (BROADCAST_ADDR, self.port))
-        self.sock.sendto(payload, (MULTI_ADDR, self.port))
+        try:
+            self.sock.sendto(payload, (BROADCAST_ADDR, self.port))
+            self.sock.sendto(payload, (MULTI_ADDR, self.port))
+        except OSError as e:
+            logger.warning("Error enviando ip_reassign: %s", e)
 
     def send_song_request(self, song_name: str):
+        if self.sock is None:
+            return
         msg = {
             "type": "song_request",
             "node_id": NODE_ID,
@@ -182,8 +234,11 @@ class AdhocManager:
             "timestamp": time.time(),
         }
         payload = json.dumps(msg).encode("utf-8")
-        self.sock.sendto(payload, (BROADCAST_ADDR, self.port))
-        self.sock.sendto(payload, (MULTI_ADDR, self.port))
+        try:
+            self.sock.sendto(payload, (BROADCAST_ADDR, self.port))
+            self.sock.sendto(payload, (MULTI_ADDR, self.port))
+        except OSError as e:
+            logger.warning("Error enviando song_request: %s", e)
 
     def _change_ip(self, new_ip: str):
         try:

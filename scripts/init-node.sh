@@ -1,48 +1,53 @@
 #!/usr/bin/env bash
-set -euo pipefail
-
-# init-node.sh — Entrypoint principal del nodo
-# Se ejecuta como servicio systemd al boot
+# init-node.sh — Entrypoint principal del nodo. Ejecutado por systemd.
 
 REPO_ROOT="/opt/adhoc-node/repo"
-VENV="/opt/adhoc-node/venv/bin/python3"
+PYTHON="/opt/adhoc-node/venv/bin/python3"
 LOG="/opt/adhoc-node/logs/node.log"
 STATE_FILE="/opt/adhoc-node/state/node-state.json"
 
 export PYTHONUNBUFFERED=1
-export NODE_ID="$(cat /etc/machine-id | cut -c1-8)"
+export NODE_ID
+NODE_ID="$(cut -c1-8 /etc/machine-id)"
 
-exec >>"$LOG" 2>&1
+# Enviar a log Y a journal (para que journalctl muestre los errores reales)
+mkdir -p "$(dirname "$LOG")"
+exec > >(tee -a "$LOG") 2>&1
 
 echo "[$(date -Iseconds)] [INIT] Nodo $NODE_ID arrancando..."
+
+# Verificar dependencias mínimas
+if [ ! -x "$PYTHON" ]; then
+    echo "[INIT] ERROR: Python no encontrado en $PYTHON. Ejecuta install-fedora.sh primero."
+    exit 1
+fi
 
 # Leer estado previo si existe y es reciente
 PREFERRED_CELL=""
 if [ -f "$STATE_FILE" ]; then
-    PREFERRED_CELL=$("$VENV" -c "
-import json, time, sys
+    PREFERRED_CELL=$("$PYTHON" -c "
+import json, time
 try:
     with open('$STATE_FILE') as f:
         d = json.load(f)
-    if time.time() - d.get('timestamp', 0) < 300:
-        print(d.get('cell_id', ''))
-    else:
-        print('')
+    print(d.get('cell_id', '') if time.time() - d.get('timestamp', 0) < 300 else '')
 except Exception:
     print('')
-")
-    if [ -n "$PREFERRED_CELL" ]; then
-        echo "[INIT] Estado previo encontrado. Intentando re-unirse a celda $PREFERRED_CELL"
-    fi
+" 2>/dev/null || true)
+    [ -n "$PREFERRED_CELL" ] && echo "[INIT] Estado previo: celda $PREFERRED_CELL"
 fi
 
-# 1) Configurar red (pasando cell_id preferida si existe)
+# 1) Configurar red — no matar el daemon si falla (red puede no tener IBSS)
 export PREFERRED_CELL
-bash "$REPO_ROOT/scripts/network-setup.sh"
+if ! bash "$REPO_ROOT/scripts/network-setup.sh"; then
+    echo "[INIT] ADVERTENCIA: network-setup.sh falló. El daemon arrancará sin red AD-HOC."
+fi
 
-# 2) Evaluar si somos Master (basado en recursos)
-IS_MASTER=$(bash "$REPO_ROOT/scripts/master-election.sh")
+# 2) Evaluar si somos Master
+IS_MASTER=$(bash "$REPO_ROOT/scripts/master-election.sh" 2>/dev/null || echo "0")
 export IS_MASTER
+echo "[INIT] IS_MASTER=$IS_MASTER"
 
 # 3) Lanzar daemon principal Python
-exec "$VENV" "$REPO_ROOT/src/node/node-daemon.py"
+echo "[INIT] Lanzando node-daemon.py..."
+exec "$PYTHON" "$REPO_ROOT/src/node/node-daemon.py"

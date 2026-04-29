@@ -17,6 +17,12 @@ if [ -z "$IFACE" ]; then
 fi
 echo "[OFF] Restaurando interfaz: $IFACE"
 
+# ─── Detener el daemon primero ──────────────────────────────────────────────
+if systemctl is-active --quiet adhoc-node.service 2>/dev/null; then
+    echo "[OFF] Deteniendo adhoc-node.service..."
+    systemctl stop adhoc-node.service && echo "[OFF] Daemon detenido." || true
+fi
+
 # ─── Eliminar config permanente de NM si fue creada ────────────────────────
 NM_CONF="/etc/NetworkManager/conf.d/99-adhoc-unmanaged.conf"
 if [ -f "$NM_CONF" ]; then

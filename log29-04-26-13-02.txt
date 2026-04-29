@@ -1,0 +1,255 @@
+Apr 29 13:01:19 fedora adhoc-node[10968]: [2026-04-29T13:01:18-06:00] [INIT] Nodo 14139bb8 arrancando...
+Apr 29 13:01:19 fedora adhoc-node[10968]: [NET] Configurando wlp3s0 (IP fija: 192.168.99.30)...
+Apr 29 13:01:19 fedora adhoc-node[10968]: [NET] Escaneando IBSS con SSID 'ADHOC-STREAM' (espera 4s)...
+Apr 29 13:01:24 fedora adhoc-node[10968]: BSS a4:15:88:aa:a7:10(on wlp3s0)
+Apr 29 13:01:24 fedora adhoc-node[10968]:         last seen: 51916.029s [boottime]
+Apr 29 13:01:24 fedora adhoc-node[10968]:         TSF: 51299206043 usec (0d, 14:14:59)
+Apr 29 13:01:24 fedora adhoc-node[10968]:         freq: 2412.0
+Apr 29 13:01:24 fedora adhoc-node[10968]:         beacon interval: 100 TUs
+Apr 29 13:01:24 fedora adhoc-node[10968]:         capability: ESS Privacy ShortPreamble ShortSlotTime APSD (0x0c31)
+Apr 29 13:01:24 fedora adhoc-node[10968]:         signal: -46.00 dBm
+Apr 29 13:01:24 fedora adhoc-node[10968]:         last seen: 4605 ms ago
+Apr 29 13:01:24 fedora adhoc-node[10968]:         Information elements from Probe Response frame:
+Apr 29 13:01:24 fedora adhoc-node[10968]:         SSID: TIGO-F921
+Apr 29 13:01:24 fedora adhoc-node[10968]:         Supported rates: 1.0* 2.0* 5.5* 11.0* 9.0 18.0 36.0 54.0
+Apr 29 13:01:24 fedora adhoc-node[10968]:         DS Parameter set: channel 1
+Apr 29 13:01:24 fedora adhoc-node[10968]:         ERP: <no flags>
+Apr 29 13:01:24 fedora adhoc-node[10968]:         Extended supported rates: 6.0 12.0 24.0 48.0
+Apr 29 13:01:24 fedora adhoc-node[10968]:         Country: DF        Environment: Indoor/Outdoor
+Apr 29 13:01:24 fedora adhoc-node[10968]:                 Channels [1 - 11] @ 25 dBm
+Apr 29 13:01:24 fedora adhoc-node[10968]:         HT capabilities:
+Apr 29 13:01:24 fedora adhoc-node[10968]:                 Capabilities: 0x1ec
+Apr 29 13:01:24 fedora adhoc-node[10968]:                         HT20
+Apr 29 13:01:24 fedora adhoc-node[10968]:                         SM Power Save disabled
+Apr 29 13:01:24 fedora adhoc-node[10968]:                         RX HT20 SGI
+Apr 29 13:01:24 fedora adhoc-node[10968]:                         RX HT40 SGI
+Apr 29 13:01:24 fedora adhoc-node[10968]:                         TX STBC
+Apr 29 13:01:24 fedora adhoc-node[10968]:                         RX STBC 1-stream
+Apr 29 13:01:24 fedora adhoc-node[10968]:                         Max AMSDU length: 3839 bytes
+Apr 29 13:01:24 fedora adhoc-node[10968]:                         No DSSS/CCK HT40
+Apr 29 13:01:24 fedora adhoc-node[10968]:                 Maximum RX AMPDU length 65535 bytes (exponent: 0x003)
+Apr 29 13:01:24 fedora adhoc-node[10968]:                 Minimum RX AMPDU time spacing: 4 usec (0x05)
+Apr 29 13:01:24 fedora adhoc-node[10968]:                 HT RX MCS rate indexes supported: 0-23
+Apr 29 13:01:24 fedora adhoc-node[10968]:                 HT TX MCS rate indexes are undefined
+Apr 29 13:01:24 fedora adhoc-node[10968]:         HT operation:
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * primary channel: 1
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * secondary channel offset: no secondary
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * STA channel width: 20 MHz
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * RIFS: 0
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * HT protection: nonmember
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * non-GF present: 0
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * OBSS non-GF present: 0
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * dual beacon: 0
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * dual CTS protection: 0
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * STBC beacon: 0
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * L-SIG TXOP Prot: 0
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * PCO active: 0
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * PCO phase: 0
+Apr 29 13:01:24 fedora adhoc-node[10968]:         RSN:         * Version: 1
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * Group cipher: CCMP
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * Pairwise ciphers: CCMP
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * Authentication suites: PSK
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * Capabilities: 1-PTKSA-RC 1-GTKSA-RC (0x0000)
+Apr 29 13:01:24 fedora adhoc-node[10968]:         WMM:         * Parameter version 1
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * u-APSD
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * BE: CW 15-1023, AIFSN 3
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * BK: CW 15-1023, AIFSN 7
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * VI: CW 7-15, AIFSN 2, TXOP 3008 usec
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * VO: CW 3-7, AIFSN 2, TXOP 1504 usec
+Apr 29 13:01:24 fedora adhoc-node[10968]:         BSS Load:
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * station count: 0
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * channel utilisation: 8/255
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * available admission capacity: 31250 [*32us]
+Apr 29 13:01:24 fedora adhoc-node[10968]:         Extended capabilities:
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * HT Information Exchange Supported
+Apr 29 13:01:24 fedora adhoc-node[10968]:         Country: DF        Environment: Indoor/Outdoor
+Apr 29 13:01:24 fedora adhoc-node[10968]:                 Channels [1 - 11] @ 16 dBm
+Apr 29 13:01:24 fedora adhoc-node[10968]:         WPS:         * Version: 1.0
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * Wi-Fi Protected Setup State: 2 (Configured)
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * Response Type: 3 (AP)
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * UUID: 301d7800-1dd2-11b2-8601-5753435f5555
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * Manufacturer: Celeno Communication, Inc.
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * Model: Celeno Wireless AP 2.4G
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * Model Number: CL1800
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * Serial Number: 12345678
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * Primary Device Type: 6-0050f204-1
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * Device name: CELENOAP24G
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * Config methods: Label, Display, Keypad
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * RF Bands: 0x1
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * Version2: 2.0
+Apr 29 13:01:24 fedora adhoc-node[10968]: BSS a4:15:88:aa:a7:15(on wlp3s0)
+Apr 29 13:01:24 fedora adhoc-node[10968]:         last seen: 51916.936s [boottime]
+Apr 29 13:01:24 fedora adhoc-node[10968]:         TSF: 51303863569 usec (0d, 14:15:03)
+Apr 29 13:01:24 fedora adhoc-node[10968]:         freq: 5200.0
+Apr 29 13:01:24 fedora adhoc-node[10968]:         beacon interval: 100 TUs
+Apr 29 13:01:24 fedora adhoc-node[10968]:         capability: ESS Privacy ShortPreamble APSD (0x0831)
+Apr 29 13:01:24 fedora adhoc-node[10968]:         signal: -71.00 dBm
+Apr 29 13:01:24 fedora adhoc-node[10968]:         last seen: 3698 ms ago
+Apr 29 13:01:24 fedora adhoc-node[10968]:         Information elements from Probe Response frame:
+Apr 29 13:01:24 fedora adhoc-node[10968]:         SSID: ARRIS-A712-5G
+Apr 29 13:01:24 fedora adhoc-node[10968]:         Supported rates: 6.0* 9.0 12.0* 18.0 24.0* 36.0 48.0 54.0
+Apr 29 13:01:24 fedora adhoc-node[10968]:         DS Parameter set: channel 40
+Apr 29 13:01:24 fedora adhoc-node[10968]:         Country: DF        Environment: Indoor/Outdoor
+Apr 29 13:01:24 fedora adhoc-node[10968]:                 Channels [36 - 64] @ 27 dBm
+Apr 29 13:01:24 fedora adhoc-node[10968]:         HT capabilities:
+Apr 29 13:01:24 fedora adhoc-node[10968]:                 Capabilities: 0x1ee
+Apr 29 13:01:24 fedora adhoc-node[10968]:                         HT20/HT40
+Apr 29 13:01:24 fedora adhoc-node[10968]:                         SM Power Save disabled
+Apr 29 13:01:24 fedora adhoc-node[10968]:                         RX HT20 SGI
+Apr 29 13:01:24 fedora adhoc-node[10968]:                         RX HT40 SGI
+Apr 29 13:01:24 fedora adhoc-node[10968]:                         TX STBC
+Apr 29 13:01:24 fedora adhoc-node[10968]:                         RX STBC 1-stream
+Apr 29 13:01:24 fedora adhoc-node[10968]:                         Max AMSDU length: 3839 bytes
+Apr 29 13:01:24 fedora adhoc-node[10968]:                         No DSSS/CCK HT40
+Apr 29 13:01:24 fedora adhoc-node[10968]:                 Maximum RX AMPDU length 65535 bytes (exponent: 0x003)
+Apr 29 13:01:24 fedora adhoc-node[10968]:                 Minimum RX AMPDU time spacing: 4 usec (0x05)
+Apr 29 13:01:24 fedora adhoc-node[10968]:                 HT RX MCS rate indexes supported: 0-23, 32
+Apr 29 13:01:24 fedora adhoc-node[10968]:                 HT TX MCS rate indexes are undefined
+Apr 29 13:01:24 fedora adhoc-node[10968]:         HT operation:
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * primary channel: 40
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * secondary channel offset: below
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * STA channel width: any
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * RIFS: 0
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * HT protection: no
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * non-GF present: 1
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * OBSS non-GF present: 0
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * dual beacon: 0
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * dual CTS protection: 0
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * STBC beacon: 0
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * L-SIG TXOP Prot: 0
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * PCO active: 0
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * PCO phase: 0
+Apr 29 13:01:24 fedora adhoc-node[10968]:         RSN:         * Version: 1
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * Group cipher: CCMP
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * Pairwise ciphers: CCMP
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * Authentication suites: PSK
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * Capabilities: 1-PTKSA-RC 1-GTKSA-RC (0x0000)
+Apr 29 13:01:24 fedora adhoc-node[10968]:         WMM:         * Parameter version 1
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * u-APSD
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * BE: CW 15-1023, AIFSN 3
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * BK: CW 15-1023, AIFSN 7
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * VI: CW 7-15, AIFSN 2, TXOP 3008 usec
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * VO: CW 3-7, AIFSN 2, TXOP 1504 usec
+Apr 29 13:01:24 fedora adhoc-node[10968]:         BSS Load:
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * station count: 1
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * channel utilisation: 0/255
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * available admission capacity: 31250 [*32us]
+Apr 29 13:01:24 fedora adhoc-node[10968]:         Country: DF        Environment: Indoor/Outdoor
+Apr 29 13:01:24 fedora adhoc-node[10968]:                 Channels [36 - 64] @ 16 dBm
+Apr 29 13:01:24 fedora adhoc-node[10968]:         WPS:         * Version: 1.0
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * Wi-Fi Protected Setup State: 2 (Configured)
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * Response Type: 3 (AP)
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * UUID: 301d7800-1dd2-11b2-8601-5753435f5555
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * Manufacturer: Celeno Communication, Inc.
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * Model: Celeno Wireless AP 5G
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * Model Number: CL1800
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * Serial Number: 12345678
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * Primary Device Type: 6-0050f204-1
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * Device name: CelenoAP5G
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * Config methods: Label, Display, Keypad
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * RF Bands: 0x2
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * Version2: 2.0
+Apr 29 13:01:24 fedora adhoc-node[10968]: BSS 14:09:b4:b7:03:bf(on wlp3s0)
+Apr 29 13:01:24 fedora adhoc-node[10968]:         last seen: 51916.092s [boottime]
+Apr 29 13:01:24 fedora adhoc-node[10968]:         TSF: 100799590813 usec (1d, 03:59:59)
+Apr 29 13:01:24 fedora adhoc-node[10968]:         freq: 2427.0
+Apr 29 13:01:24 fedora adhoc-node[10968]:         beacon interval: 100 TUs
+Apr 29 13:01:24 fedora adhoc-node[10968]:         capability: ESS Privacy ShortPreamble ShortSlotTime (0x0431)
+Apr 29 13:01:24 fedora adhoc-node[10968]:         signal: -90.00 dBm
+Apr 29 13:01:24 fedora adhoc-node[10968]:         last seen: 4542 ms ago
+Apr 29 13:01:24 fedora adhoc-node[10968]:         SSID: CLARO_B703BF
+Apr 29 13:01:24 fedora adhoc-node[10968]:         Supported rates: 1.0* 2.0* 5.5* 11.0* 9.0 18.0 36.0 54.0
+Apr 29 13:01:24 fedora adhoc-node[10968]:         DS Parameter set: channel 4
+Apr 29 13:01:24 fedora adhoc-node[10968]:         Extended supported rates: 6.0 12.0 24.0 48.0
+Apr 29 13:01:24 fedora adhoc-node[10968]:         Country: GT        Environment: Indoor/Outdoor
+Apr 29 13:01:24 fedora adhoc-node[10968]:                 Channels [1 - 11] @ 20 dBm
+Apr 29 13:01:24 fedora adhoc-node[10968]:         AP Channel Report:
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * operating class: 32
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * channel(s): 1 2 3 4 5 6 7
+Apr 29 13:01:24 fedora adhoc-node[10968]:         AP Channel Report:
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * operating class: 33
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * channel(s): 5 6 7 8 9 10 11
+Apr 29 13:01:24 fedora adhoc-node[10968]:         TIM: DTIM Count 0 DTIM Period 1 Bitmap Control 0x1 Bitmap[0] 0x41
+Apr 29 13:01:24 fedora adhoc-node[10968]:         RSN:         * Version: 1
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * Group cipher: CCMP
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * Pairwise ciphers: CCMP
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * Authentication suites: PSK
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * Capabilities: 1-PTKSA-RC 1-GTKSA-RC (0x0000)
+Apr 29 13:01:24 fedora adhoc-node[10968]:         WPS:         * Version: 1.0
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * Wi-Fi Protected Setup State: 2 (Configured)
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * UUID: bc329e00-1dd8-11b2-8601-1409b4b703bf
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * RF Bands: 0x1
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * Version2: 2.0
+Apr 29 13:01:24 fedora adhoc-node[10968]:         ERP: <no flags>
+Apr 29 13:01:24 fedora adhoc-node[10968]:         HT capabilities:
+Apr 29 13:01:24 fedora adhoc-node[10968]:                 Capabilities: 0x106c
+Apr 29 13:01:24 fedora adhoc-node[10968]:                         HT20
+Apr 29 13:01:24 fedora adhoc-node[10968]:                         SM Power Save disabled
+Apr 29 13:01:24 fedora adhoc-node[10968]:                         RX HT20 SGI
+Apr 29 13:01:24 fedora adhoc-node[10968]:                         RX HT40 SGI
+Apr 29 13:01:24 fedora adhoc-node[10968]:                         No RX STBC
+Apr 29 13:01:24 fedora adhoc-node[10968]:                         Max AMSDU length: 3839 bytes
+Apr 29 13:01:24 fedora adhoc-node[10968]:                         DSSS/CCK HT40
+Apr 29 13:01:24 fedora adhoc-node[10968]:                 Maximum RX AMPDU length 65535 bytes (exponent: 0x003)
+Apr 29 13:01:24 fedora adhoc-node[10968]:                 Minimum RX AMPDU time spacing: 4 usec (0x05)
+Apr 29 13:01:24 fedora adhoc-node[10968]:                 HT RX MCS rate indexes supported: 0-15, 32
+Apr 29 13:01:24 fedora adhoc-node[10968]:                 HT TX MCS rate indexes are undefined
+Apr 29 13:01:24 fedora adhoc-node[10968]:         HT operation:
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * primary channel: 4
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * secondary channel offset: no secondary
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * STA channel width: 20 MHz
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * RIFS: 0
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * HT protection: non-HT mixed
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * non-GF present: 1
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * OBSS non-GF present: 0
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * dual beacon: 0
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * dual CTS protection: 0
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * STBC beacon: 0
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * L-SIG TXOP Prot: 0
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * PCO active: 0
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * PCO phase: 0
+Apr 29 13:01:24 fedora adhoc-node[10968]:         Overlapping BSS scan params:
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * passive dwell: 20 TUs
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * active dwell: 10 TUs
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * channel width trigger scan interval: 300 s
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * scan passive total per channel: 200 TUs
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * scan active total per channel: 20 TUs
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * BSS width channel transition delay factor: 5
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * OBSS Scan Activity Threshold: 0.25 %
+Apr 29 13:01:24 fedora adhoc-node[10968]:         Extended capabilities:
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * HT Information Exchange Supported
+Apr 29 13:01:24 fedora adhoc-node[10968]:         WMM:         * Parameter version 1
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * BE: CW 15-1023, AIFSN 3
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * BK: CW 15-1023, AIFSN 7
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * VI: CW 7-15, AIFSN 2, TXOP 3008 usec
+Apr 29 13:01:24 fedora adhoc-node[10968]:                  * VO: CW 3-7, AIFSN 2, TXOP 1504 usec
+Apr 29 13:01:28 fedora adhoc-node[10968]: [NET] Creando IBSS propia...
+Apr 29 13:01:28 fedora adhoc-node[10968]: [NET] Configuración finalizada. IP: 192.168.99.30
+Apr 29 13:01:28 fedora adhoc-node[10968]: 3: wlp3s0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc noqueue state DOWN group default qlen 1000
+Apr 29 13:01:28 fedora adhoc-node[10968]:     link/ether b0:68:e6:27:70:a7 brd ff:ff:ff:ff:ff:ff
+Apr 29 13:01:28 fedora adhoc-node[10968]:     altname wlxb068e62770a7
+Apr 29 13:01:28 fedora adhoc-node[10968]:     inet 192.168.99.30/24 scope global wlp3s0
+Apr 29 13:01:28 fedora adhoc-node[10968]:        valid_lft forever preferred_lft forever
+Apr 29 13:01:28 fedora adhoc-node[10968]: [INIT] IS_MASTER=1
+Apr 29 13:01:28 fedora adhoc-node[10968]: [INIT] Lanzando node-daemon.py...
+Apr 29 13:01:29 fedora adhoc-node[10968]: 2026-04-29 13:01:29,070 [WARNING] network.adhoc_manager: Multicast join falló (no fatal): [Errno 19] No such device
+Apr 29 13:01:29 fedora adhoc-node[10968]: 2026-04-29 13:01:29,070 [INFO] network.adhoc_manager: Socket UDP bound en puerto 5005
+Apr 29 13:01:29 fedora adhoc-node[10968]: 2026-04-29 13:01:29,070 [INFO] __main__: Nodo 14139bb8 iniciando daemon...
+Apr 29 13:01:29 fedora adhoc-node[10968]:  * Serving Flask app 'web.app'
+Apr 29 13:01:29 fedora adhoc-node[10968]:  * Debug mode: off
+Apr 29 13:01:29 fedora adhoc-node[10968]: 2026-04-29 13:01:29,075 [WARNING] network.adhoc_manager: Error enviando heartbeat: [Errno 101] Network is unreachable
+Apr 29 13:01:29 fedora adhoc-node[10968]: 2026-04-29 13:01:29,077 [INFO] werkzeug: WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+Apr 29 13:01:29 fedora adhoc-node[10968]:  * Running on all addresses (0.0.0.0)
+Apr 29 13:01:29 fedora adhoc-node[10968]:  * Running on http://127.0.0.1:8080
+Apr 29 13:01:29 fedora adhoc-node[10968]:  * Running on http://127.0.0.1:8080
+Apr 29 13:01:29 fedora adhoc-node[10968]: 2026-04-29 13:01:29,077 [INFO] werkzeug: Press CTRL+C to quit
+Apr 29 13:01:31 fedora adhoc-node[10968]: 2026-04-29 13:01:31,073 [INFO] __main__: Este nodo es ahora MASTER
+Apr 29 13:01:31 fedora adhoc-node[10968]: 2026-04-29 13:01:31,073 [ERROR] streaming.streamer: Error en sniff_multicast: [Errno 19] No such device
+Apr 29 13:01:31 fedora adhoc-node[10968]: 2026-04-29 13:01:31,075 [INFO] __main__: Master elige aleatoriamente local: song_22.mp3
+Apr 29 13:01:31 fedora adhoc-node[10968]: 2026-04-29 13:01:31,075 [INFO] streaming.streamer: Iniciando servidor de stream local: song_22.mp3
+Apr 29 13:01:32 fedora adhoc-node[10968]: 2026-04-29 13:01:32,082 [WARNING] network.adhoc_manager: Error enviando heartbeat: [Errno 101] Network is unreachable
+Apr 29 13:01:35 fedora adhoc-node[10968]: 2026-04-29 13:01:35,089 [WARNING] network.adhoc_manager: Error enviando heartbeat: [Errno 101] Network is unreachable
+Apr 29 13:01:38 fedora adhoc-node[10968]: 2026-04-29 13:01:38,092 [WARNING] network.adhoc_manager: Error enviando heartbeat: [Errno 101] Network is unreachable
+Apr 29 13:01:41 fedora adhoc-node[10968]: 2026-04-29 13:01:41,100 [WARNING] network.adhoc_manager: Error enviando heartbeat: [Errno 101] Network is unreachable
+Apr 29 13:01:44 fedora adhoc-node[10968]: 2026-04-29 13:01:44,107 [WARNING] network.adhoc_manager: Error enviando heartbeat: [Errno 101] Network is unreachable
+Apr 29 13:01:47 fedora adhoc-node[10968]: 2026-04-29 13:01:47,115 [WARNING] network.adhoc_manager: Error enviando heartbeat: [Errno 101] Network is unreachable

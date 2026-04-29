@@ -20,6 +20,13 @@ FIXED_IP="${IP_PREFIX}.${LAST_OCTET}"
 
 echo "[NET] Configurando $IFACE (IP fija: $FIXED_IP)..."
 
+# Si la interfaz ya está en IBSS con la IP correcta, no hace falta reconfigurar
+if iw dev "$IFACE" info 2>/dev/null | grep -q "type IBSS" && \
+   ip addr show dev "$IFACE" 2>/dev/null | grep -q "${FIXED_IP}/24"; then
+    echo "[NET] Interfaz ya configurada en modo IBSS con IP $FIXED_IP. Saltando setup."
+    exit 0
+fi
+
 # Liberar de NM (runtime, sin archivo permanente)
 nmcli device set "$IFACE" managed no 2>/dev/null || true
 nmcli device disconnect "$IFACE" 2>/dev/null || true
@@ -52,10 +59,16 @@ _assign_ip_and_exit() {
 
 _join_ibss() {
     local cell="$1" freq="$2"
-    ip link set "$IFACE" down
-    iw dev "$IFACE" set type ibss
-    ip link set "$IFACE" up
-    iw dev "$IFACE" ibss join "$SSID" "$freq" fixed-freq "$cell"
+    ip link set "$IFACE" down 2>/dev/null || true
+    if ! iw dev "$IFACE" set type ibss 2>/dev/null; then
+        echo "[NET] ERROR: iw set type ibss falló. El chipset puede no soportar IBSS."
+        return 1
+    fi
+    ip link set "$IFACE" up 2>/dev/null || true
+    if ! iw dev "$IFACE" ibss join "$SSID" "$freq" fixed-freq "$cell" 2>/dev/null; then
+        echo "[NET] ERROR: ibss join falló (freq=${freq}, cell=${cell})"
+        return 1
+    fi
 }
 
 # === Reintento a celda preferida ===
@@ -65,7 +78,7 @@ if [ -n "$PREFERRED_CELL" ]; then
     sleep 4
     FOUND=$(iw dev "$IFACE" scan dump 2>/dev/null | awk -v ssid="$SSID" -v cell="$PREFERRED_CELL" '
         /^BSS /    { bssid=$2; gsub(/\(on .+\)/, "", bssid); freq=""; signal="" }
-        /^\tfreq:/    { freq=$2 }
+        /^\tfreq:/    { freq=int($2) }
         /^\tsignal:/  { signal=$2 }
         /^\tSSID:/    { if ($2 == ssid && bssid == cell) print freq, signal }
     ' || true)
@@ -87,7 +100,7 @@ sleep 4
 
 SCAN_RESULTS=$(iw dev "$IFACE" scan dump 2>/dev/null | awk -v ssid="$SSID" '
     /^BSS /   { bssid=$2; gsub(/\(on .+\)/, "", bssid); freq=""; signal="" }
-    /^\tfreq:/   { freq=$2 }
+    /^\tfreq:/   { freq=int($2) }
     /^\tsignal:/ { signal=$2 }
     /^\tSSID:/   { if ($2 == ssid && bssid != "" && freq != "" && signal != "") print bssid, freq, signal }
 ' || true)
@@ -112,13 +125,30 @@ done <<< "$SCAN_RESULTS"
 
 if [ -n "$BEST_BSSID" ]; then
     echo "[NET] Uniendo a mejor red: $BEST_BSSID (${BEST_SIGNAL} dBm)"
-    _join_ibss "$BEST_BSSID" "$BEST_FREQ"
-    _assign_ip_and_exit "$BEST_BSSID" "0"
-else
-    echo "[NET] Sin redes en rango. Creando IBSS propia..."
-    RAND_MAC=$(printf '02:%02x:%02x:%02x:%02x:%02x' \
-        $((RANDOM % 256)) $((RANDOM % 256)) $((RANDOM % 256)) \
-        $((RANDOM % 256)) $((RANDOM % 256)))
-    _join_ibss "$RAND_MAC" "$FREQ"
+    if _join_ibss "$BEST_BSSID" "$BEST_FREQ"; then
+        _assign_ip_and_exit "$BEST_BSSID" "0"
+    else
+        echo "[NET] ERROR: No se pudo unir a red existente. Intentando crear red propia..."
+    fi
+fi
+
+# Crear red propia (también como fallback si join falló)
+echo "[NET] Creando IBSS propia..."
+RAND_MAC=$(printf '02:%02x:%02x:%02x:%02x:%02x' \
+    $((RANDOM % 256)) $((RANDOM % 256)) $((RANDOM % 256)) \
+    $((RANDOM % 256)) $((RANDOM % 256)))
+if _join_ibss "$RAND_MAC" "$FREQ"; then
     _assign_ip_and_exit "$RAND_MAC" "1"
+else
+    echo "[NET] ERROR CRÍTICO: No se pudo crear red IBSS. Chipset sin soporte IBSS."
+    # Asignar IP de todas formas para que el daemon pueda arrancar
+    ip link set "$IFACE" up 2>/dev/null || true
+    if ! ip addr show dev "$IFACE" | grep -q "${FIXED_IP}/24"; then
+        ip addr add "${FIXED_IP}/24" dev "$IFACE" 2>/dev/null || true
+    fi
+    echo "$FIXED_IP" > /tmp/adhoc/my_ip
+    echo "00:00:00:00:00:00" > /tmp/adhoc/cell_id
+    touch /tmp/adhoc-master.flag
+    echo "[NET] Continuando sin IBSS con IP $FIXED_IP (modo degradado)"
+    exit 1
 fi

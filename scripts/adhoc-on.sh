@@ -56,7 +56,7 @@ sleep 4
 
 SCAN_RESULTS=$(iw dev "$IFACE" scan dump 2>/dev/null | awk -v ssid="$SSID" '
     /^BSS /   { bssid=$2; gsub(/\(on .+\)/, "", bssid); freq=""; signal="" }
-    /^\tfreq:/   { freq=$2 }
+    /^\tfreq:/   { freq=int($2) }
     /^\tsignal:/ { signal=$2 }
     /^\tSSID:/   { if ($2 == ssid && bssid != "" && freq != "" && signal != "") print bssid, freq, signal }
 ' || true)
@@ -117,3 +117,12 @@ echo "     Cell ID  : $(cat /tmp/adhoc/cell_id)"
 echo "     Para apagar: sudo $(dirname "$0")/adhoc-off.sh"
 echo ""
 ip addr show "$IFACE"
+
+# Arrancar el daemon si está instalado
+if systemctl list-unit-files adhoc-node.service &>/dev/null; then
+    echo "[ON] Arrancando adhoc-node.service..."
+    systemctl start adhoc-node.service && echo "[ON] Daemon arrancado. Dashboard: http://${FIXED_IP}:8080" \
+        || echo "[ON] ADVERTENCIA: el daemon no arrancó. Revisa: journalctl -u adhoc-node.service"
+else
+    echo "[ON] (adhoc-node.service no instalado — omitiendo arranque de daemon)"
+fi
