@@ -83,7 +83,7 @@ if [ -n "$PREFERRED_CELL" ]; then
     iw dev "$IFACE" scan ap-force 2>/dev/null || iw dev "$IFACE" scan 2>/dev/null || true
     sleep 4
     FOUND=$(iw dev "$IFACE" scan dump 2>/dev/null | awk -v ssid="$SSID" -v cell="$PREFERRED_CELL" '
-        /^BSS /    { bssid=$2; gsub(/\(on .+\)/, "", bssid); freq=""; signal="" }
+        /^BSS /    { bssid=$2; gsub(/\(.*/, "", bssid); freq=""; signal="" }
         /^\tfreq:/    { freq=int($2) }
         /^\tsignal:/  { signal=$2 }
         /^\tSSID:/    { if ($2 == ssid && bssid == cell) print freq, signal }
@@ -105,7 +105,7 @@ iw dev "$IFACE" scan ap-force 2>/dev/null || iw dev "$IFACE" scan 2>/dev/null ||
 sleep 4
 
 SCAN_RESULTS=$(iw dev "$IFACE" scan dump 2>/dev/null | awk -v ssid="$SSID" '
-    /^BSS /   { bssid=$2; gsub(/\(on .+\)/, "", bssid); freq=""; signal="" }
+    /^BSS /   { bssid=$2; gsub(/\(.*/, "", bssid); freq=""; signal="" }
     /^\tfreq:/   { freq=int($2) }
     /^\tsignal:/ { signal=$2 }
     /^\tSSID:/   { if ($2 == ssid && bssid != "" && freq != "" && signal != "") print bssid, freq, signal }

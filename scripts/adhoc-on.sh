@@ -72,7 +72,7 @@ iw dev "$IFACE" scan ap-force 2>/dev/null || iw dev "$IFACE" scan 2>/dev/null ||
 sleep 4
 
 SCAN_RESULTS=$(iw dev "$IFACE" scan dump 2>/dev/null | awk -v ssid="$SSID" '
-    /^BSS /   { bssid=$2; gsub(/\(on .+\)/, "", bssid); freq=""; signal="" }
+    /^BSS /   { bssid=$2; gsub(/\(.*/, "", bssid); freq=""; signal="" }
     /^\tfreq:/   { freq=int($2) }
     /^\tsignal:/ { signal=$2 }
     /^\tSSID:/   { if ($2 == ssid && bssid != "" && freq != "" && signal != "") print bssid, freq, signal }
@@ -103,7 +103,7 @@ if [ -z "$BEST_BSSID" ]; then
     echo "[ON] Sin redes en rango. Esperando ${DELAY}s y reescaneando..."
     sleep "$DELAY"
     SCAN_RESULTS2=$(iw dev "$IFACE" scan dump 2>/dev/null | awk -v ssid="$SSID" '
-        /^BSS /   { bssid=$2; gsub(/\(on .+\)/, "", bssid); freq=""; signal="" }
+        /^BSS /   { bssid=$2; gsub(/\(.*/, "", bssid); freq=""; signal="" }
         /^\tfreq:/   { freq=int($2) }
         /^\tsignal:/ { signal=$2 }
         /^\tSSID:/   { if ($2 == ssid && bssid != "" && freq != "" && signal != "") print bssid, freq, signal }

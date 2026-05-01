@@ -36,7 +36,7 @@ sleep 3
 
 # Parsear resultados (freq convertida a entero para compatibilidad con ibss join)
 SCAN_RESULTS=$(iw dev "$IFACE" scan dump 2>/dev/null | awk -v ssid="$SSID" '
-    /^BSS /   { bssid=$2; gsub(/\(on .+\)/, "", bssid); freq=""; signal="" }
+    /^BSS /   { bssid=$2; gsub(/\(.*/, "", bssid); freq=""; signal="" }
     /^\tfreq:/   { freq=int($2) }
     /^\tsignal:/ { signal=$2 }
     /^\tSSID:/   {
