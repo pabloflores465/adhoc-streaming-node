@@ -12,7 +12,21 @@ from typing import Dict, List, Any, Optional
 
 logger = logging.getLogger(__name__)
 
-IFACE = os.environ.get("ADHOC_IFACE", "wlan0")
+
+def _detect_iface() -> str:
+    configured = os.environ.get("ADHOC_IFACE", "")
+    if configured and os.path.exists(f"/sys/class/net/{configured}"):
+        return configured
+    try:
+        for p in Path("/sys/class/net").iterdir():
+            if (p / "wireless").exists():
+                return p.name
+    except Exception:
+        pass
+    return configured or "wlan0"
+
+
+IFACE = _detect_iface()
 MUSIC_DIR = os.environ.get("ADHOC_MUSIC", "/opt/adhoc-node/music")
 _IW_TIMEOUT = 4  # segundos máximos para cualquier llamada a iw
 

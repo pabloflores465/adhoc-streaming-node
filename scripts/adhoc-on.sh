@@ -4,13 +4,14 @@
 # Para restaurar internet: sudo ./scripts/adhoc-off.sh
 set -euo pipefail
 
-IFACE="${ADHOC_IFACE:-}"
 SSID="${ADHOC_SSID:-ADHOC-STREAM}"
 FREQ="${ADHOC_FREQ:-2412}"
 IP_PREFIX="${ADHOC_NET:-192.168.99}"
 
 # ─── Auto-detectar interfaz inalámbrica ────────────────────────────────────
-if [ -z "$IFACE" ]; then
+# Si ADHOC_IFACE está seteada pero no existe en el sistema, también auto-detecta.
+IFACE="${ADHOC_IFACE:-}"
+if [ -z "$IFACE" ] || [ ! -e "/sys/class/net/$IFACE" ]; then
     for _dev in /sys/class/net/*/wireless; do
         [ -d "$_dev" ] && IFACE=$(basename "$(dirname "$_dev")") && break
     done

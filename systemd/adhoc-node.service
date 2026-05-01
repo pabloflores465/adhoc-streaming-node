@@ -11,7 +11,6 @@ RestartSec=5
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=adhoc-node
-Environment="ADHOC_IFACE=wlan0"
 Environment="ADHOC_SSID=ADHOC-STREAM"
 Environment="ADHOC_FREQ=2412"
 Environment="ADHOC_NET=192.168.99"

@@ -3,7 +3,13 @@
 # Para uso manual usa adhoc-on.sh / adhoc-off.sh.
 set -euo pipefail
 
-IFACE="${ADHOC_IFACE:-wlan0}"
+_iface_auto() {
+    local c="${ADHOC_IFACE:-}"
+    if [ -n "$c" ] && [ -e "/sys/class/net/$c" ]; then printf '%s' "$c"; return; fi
+    for _d in /sys/class/net/*/wireless; do [ -d "$_d" ] && basename "$(dirname "$_d")" && return; done
+    printf '%s' "${c:-wlan0}"
+}
+IFACE=$(_iface_auto)
 SSID="${ADHOC_SSID:-ADHOC-STREAM}"
 FREQ="${ADHOC_FREQ:-2412}"
 IP_PREFIX="${ADHOC_NET:-192.168.99}"

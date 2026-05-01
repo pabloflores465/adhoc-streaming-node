@@ -15,7 +15,22 @@ from typing import Dict, Any, Optional, Callable
 
 logger = logging.getLogger(__name__)
 
-IFACE = os.environ.get("ADHOC_IFACE", "wlan0")
+
+def _detect_iface() -> str:
+    configured = os.environ.get("ADHOC_IFACE", "")
+    if configured and os.path.exists(f"/sys/class/net/{configured}"):
+        return configured
+    try:
+        import pathlib
+        for p in pathlib.Path("/sys/class/net").iterdir():
+            if (p / "wireless").exists():
+                return p.name
+    except Exception:
+        pass
+    return configured or "wlan0"
+
+
+IFACE = _detect_iface()
 MULTI_ADDR = os.environ.get("ADHOC_MULTI", "239.255.42.42")
 PORT = int(os.environ.get("ADHOC_PORT", "5004"))
 HEARTBEAT_PORT = PORT + 1
@@ -81,8 +96,11 @@ class AdhocManager:
 
     def _get_my_ip(self) -> str:
         try:
-            out = subprocess.check_output(["ip", "addr", "show", "dev", IFACE], text=True)
-            for line in out.splitlines():
+            result = subprocess.run(
+                ["ip", "addr", "show", "dev", IFACE],
+                capture_output=True, text=True
+            )
+            for line in result.stdout.splitlines():
                 if "inet " in line:
                     return line.split()[1].split("/")[0]
         except Exception:
