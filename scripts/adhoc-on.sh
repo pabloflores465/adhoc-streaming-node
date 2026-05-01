@@ -162,6 +162,15 @@ echo "     Para apagar: sudo $(dirname "$0")/adhoc-off.sh"
 echo ""
 ip addr show "$IFACE"
 
+# ─── Abrir puertos en firewalld para tráfico adhoc ─────────────────────────
+if command -v firewall-cmd &>/dev/null && systemctl is-active --quiet firewalld 2>/dev/null; then
+    echo "[ON] Configurando firewalld: zona trusted para $IFACE..."
+    firewall-cmd --zone=trusted --add-interface="$IFACE" 2>/dev/null || true
+    firewall-cmd --zone=trusted --add-port=8080/tcp 2>/dev/null || true
+    firewall-cmd --zone=trusted --add-port=5004/udp 2>/dev/null || true
+    firewall-cmd --zone=trusted --add-port=5005/udp 2>/dev/null || true
+fi
+
 # Arrancar (o reiniciar) el daemon para cargar el código recién sincronizado
 if systemctl list-unit-files adhoc-node.service &>/dev/null; then
     echo "[ON] Reiniciando adhoc-node.service (cargando código actualizado)..."

@@ -17,6 +17,11 @@ if [ -z "$IFACE" ]; then
 fi
 echo "[OFF] Restaurando interfaz: $IFACE"
 
+# ─── Quitar interfaz de zona trusted de firewalld ──────────────────────────
+if command -v firewall-cmd &>/dev/null && systemctl is-active --quiet firewalld 2>/dev/null; then
+    firewall-cmd --zone=trusted --remove-interface="$IFACE" 2>/dev/null || true
+fi
+
 # ─── Detener el daemon primero ──────────────────────────────────────────────
 if systemctl is-active --quiet adhoc-node.service 2>/dev/null; then
     echo "[OFF] Deteniendo adhoc-node.service..."
