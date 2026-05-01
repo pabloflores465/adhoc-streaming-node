@@ -77,7 +77,7 @@ class NodeDaemon:
             song_change_callback=self._on_song_change,
             on_eof_callback=self._on_stream_eof,
         )
-        self.is_master = False
+        self.is_master = os.environ.get("IS_MASTER", "0") == "1"
         self.forced_master = False
         self.forced_song: str | None = None
         self.last_pick_time = 0

@@ -38,6 +38,7 @@ class AdhocManager:
         self.on_song_request_fn = on_song_request_fn
         self.port = port if port is not None else HEARTBEAT_PORT
         self.sock: Optional[socket.socket] = None
+        self._start_time = time.time()
         self._bind_socket()
 
     def _bind_socket(self):
@@ -174,6 +175,11 @@ class AdhocManager:
         my_score = self._my_score()
         with self.lock:
             if not self.peers:
+                # Startup grace period: don't claim master for the first 10s.
+                # This prevents a joining node from declaring itself master before
+                # receiving heartbeats from the existing master in the network.
+                if time.time() - self._start_time < 10:
+                    return False
                 return True
             for info in self.peers.values():
                 if info["score"] > my_score:
