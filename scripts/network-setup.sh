@@ -11,10 +11,10 @@ PREFERRED_CELL="${PREFERRED_CELL:-}"
 
 mkdir -p /tmp/adhoc
 
-# IP fija derivada de machine-id
-MACHINE_ID=$(cat /etc/machine-id)
-HEX_BYTE=${MACHINE_ID:0:2}
-DEC=$((16#$HEX_BYTE))
+# IP fija derivada del último byte de la MAC (única por hardware)
+_MAC_LAST=$(ip link show "$IFACE" 2>/dev/null | awk '/ether/{print $2}' | awk -F: '{print $6}' | head -1)
+[ -z "$_MAC_LAST" ] && _MAC_LAST=$(cut -c1-2 /etc/machine-id)
+DEC=$((16#$_MAC_LAST))
 LAST_OCTET=$(( (DEC % 240) + 10 ))
 FIXED_IP="${IP_PREFIX}.${LAST_OCTET}"
 

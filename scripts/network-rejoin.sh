@@ -24,14 +24,17 @@ fi
 
 ip link set "$IFACE" up 2>/dev/null || true
 
-# Escanear y parsear
-SCAN_RESULTS=$(iw dev "$IFACE" scan 2>/dev/null | awk -v ssid="$SSID" '
-    /^BSS / { bssid=$2; freq=""; signal="" }
-    /freq:/ { freq=$2 }
-    /signal:/ { signal=$2 }
-    /SSID: / {
-        if ($2 == ssid) {
-            gsub(/\(on .+\)/, "", bssid)
+# Escaneo activo + espera para obtener resultados frescos en modo IBSS
+iw dev "$IFACE" scan ap-force 2>/dev/null || iw dev "$IFACE" scan 2>/dev/null || true
+sleep 3
+
+# Parsear resultados (freq convertida a entero para compatibilidad con ibss join)
+SCAN_RESULTS=$(iw dev "$IFACE" scan dump 2>/dev/null | awk -v ssid="$SSID" '
+    /^BSS /   { bssid=$2; gsub(/\(on .+\)/, "", bssid); freq=""; signal="" }
+    /^\tfreq:/   { freq=int($2) }
+    /^\tsignal:/ { signal=$2 }
+    /^\tSSID:/   {
+        if ($2 == ssid && bssid != "" && freq != "" && signal != "") {
             print bssid, freq, signal
         }
     }
@@ -90,21 +93,31 @@ fi
 # === MIGRACIÓN ===
 echo "[$(date -Iseconds)] [REJOIN] Migrando $CURRENT_CELL (${CURRENT_SIGNAL} dBm) -> $BEST_BSSID (${BEST_SIGNAL} dBm)" >> "$LOG"
 
-# Leer IP fija
+# Leer IP fija (siempre usamos la misma IP, derivada de MAC)
 FIXED_IP="${IP_PREFIX}.1"
 if [ -f /tmp/adhoc/my_ip ]; then
     FIXED_IP=$(cat /tmp/adhoc/my_ip)
 fi
 
-ip link set "$IFACE" down
+ip link set "$IFACE" down 2>/dev/null || true
+iw dev "$IFACE" ibss leave 2>/dev/null || true
 iw dev "$IFACE" set type managed 2>/dev/null || true
 ip addr flush dev "$IFACE" 2>/dev/null || true
 
-iw dev "$IFACE" set type ibss
-ip link set "$IFACE" up
-iw dev "$IFACE" ibss join "$SSID" "$BEST_FREQ" fixed-freq "$BEST_BSSID"
+if ! iw dev "$IFACE" set type ibss 2>/dev/null; then
+    echo "[$(date -Iseconds)] [REJOIN] ERROR: set type ibss falló. Abortando migración." >> "$LOG"
+    exit 1
+fi
+ip link set "$IFACE" up 2>/dev/null || true
 
-ip addr add "${FIXED_IP}/24" dev "$IFACE"
+if ! iw dev "$IFACE" ibss join "$SSID" "$BEST_FREQ" fixed-freq "$BEST_BSSID" 2>/dev/null; then
+    echo "[$(date -Iseconds)] [REJOIN] ERROR: ibss join falló. Abortando migración." >> "$LOG"
+    exit 1
+fi
+
+if ! ip addr show dev "$IFACE" | grep -q "${FIXED_IP}/24"; then
+    ip addr add "${FIXED_IP}/24" dev "$IFACE" 2>/dev/null || true
+fi
 echo "$BEST_BSSID" > /tmp/adhoc/cell_id
 rm -f /tmp/adhoc-master.flag
 

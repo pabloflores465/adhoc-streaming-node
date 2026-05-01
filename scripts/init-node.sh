@@ -8,7 +8,19 @@ STATE_FILE="/opt/adhoc-node/state/node-state.json"
 
 export PYTHONUNBUFFERED=1
 export NODE_ID
-NODE_ID="$(cut -c1-8 /etc/machine-id)"
+
+# Derivar NODE_ID de la MAC (único por hardware, invariante en clones USB)
+_IFACE="${ADHOC_IFACE:-wlan0}"
+# Buscar interfaz inalámbrica si la configurada no existe
+if [ ! -e "/sys/class/net/$_IFACE" ]; then
+    for _d in /sys/class/net/*/wireless; do
+        [ -d "$_d" ] && _IFACE=$(basename "$(dirname "$_d")") && break
+    done
+fi
+_MAC=$(ip link show "$_IFACE" 2>/dev/null | awk '/ether/{gsub(/:/,""); print $2}' | head -1)
+[ -z "$_MAC" ] && _MAC=$(ip link show 2>/dev/null | awk '/ether/{gsub(/:/,""); print $2; exit}')
+[ -z "$_MAC" ] && _MAC=$(cut -c1-12 /etc/machine-id)
+NODE_ID="${_MAC:0:8}"
 
 # Enviar a log Y a journal (para que journalctl muestre los errores reales)
 mkdir -p "$(dirname "$LOG")"

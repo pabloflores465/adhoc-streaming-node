@@ -181,8 +181,12 @@ class AdhocManager:
                 if time.time() - self._start_time < 10:
                     return False
                 return True
-            for info in self.peers.values():
-                if info["score"] > my_score:
+            for nid, info in self.peers.items():
+                peer_score = info["score"]
+                if peer_score > my_score:
+                    return False
+                # Tiebreaker: higher node_id string wins (deterministic on equal score)
+                if peer_score == my_score and nid > NODE_ID:
                     return False
             return True
 

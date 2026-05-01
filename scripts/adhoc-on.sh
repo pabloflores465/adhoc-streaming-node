@@ -21,10 +21,10 @@ if [ -z "$IFACE" ]; then
 fi
 echo "[ON] Interfaz: $IFACE | SSID: $SSID | Freq: ${FREQ}MHz"
 
-# ─── IP fija derivada de machine-id ────────────────────────────────────────
-MACHINE_ID=$(cat /etc/machine-id)
-HEX_BYTE=${MACHINE_ID:0:2}
-DEC=$((16#$HEX_BYTE))
+# ─── IP fija derivada del último byte de la MAC (única por hardware) ───────
+_MAC_LAST=$(ip link show "$IFACE" 2>/dev/null | awk '/ether/{print $2}' | awk -F: '{print $6}' | head -1)
+[ -z "$_MAC_LAST" ] && _MAC_LAST=$(cut -c1-2 /etc/machine-id)
+DEC=$((16#$_MAC_LAST))
 LAST_OCTET=$(( (DEC % 240) + 10 ))
 FIXED_IP="${IP_PREFIX}.${LAST_OCTET}"
 
@@ -78,6 +78,33 @@ while IFS= read -r line; do
         BEST_FREQ=$freq
     fi
 done <<< "$SCAN_RESULTS"
+
+# ─── Si no se encontró red, esperar un tiempo aleatorio y reescanear ───────
+# Esto evita la condición de carrera cuando dos PCs arrancan simultáneamente.
+if [ -z "$BEST_BSSID" ]; then
+    DELAY=$(( (RANDOM % 12) + 3 ))
+    echo "[ON] Sin redes en rango. Esperando ${DELAY}s y reescaneando..."
+    sleep "$DELAY"
+    SCAN_RESULTS2=$(iw dev "$IFACE" scan dump 2>/dev/null | awk -v ssid="$SSID" '
+        /^BSS /   { bssid=$2; gsub(/\(on .+\)/, "", bssid); freq=""; signal="" }
+        /^\tfreq:/   { freq=int($2) }
+        /^\tsignal:/ { signal=$2 }
+        /^\tSSID:/   { if ($2 == ssid && bssid != "" && freq != "" && signal != "") print bssid, freq, signal }
+    ' || true)
+    while IFS= read -r line; do
+        [ -z "$line" ] && continue
+        bssid=$(awk '{print $1}' <<< "$line")
+        freq=$(awk '{print $2}' <<< "$line")
+        signal=$(awk '{print $3}' <<< "$line")
+        sig_int=$(awk "BEGIN {printf \"%d\", ($signal+0)}" 2>/dev/null || echo "-999")
+        echo "[ON] (2do escaneo) Encontrada: $bssid @ ${freq}MHz (${signal} dBm)"
+        if [ "$sig_int" -gt "$BEST_SIGNAL" ]; then
+            BEST_SIGNAL=$sig_int
+            BEST_BSSID=$bssid
+            BEST_FREQ=$freq
+        fi
+    done <<< "$SCAN_RESULTS2"
+fi
 
 # ─── Cambiar a modo IBSS ────────────────────────────────────────────────────
 ip link set "$IFACE" down
