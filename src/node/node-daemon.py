@@ -78,7 +78,7 @@ class NodeDaemon:
             on_eof_callback=self._on_stream_eof,
         )
         self.is_master = os.environ.get("IS_MASTER", "0") == "1"
-        self.forced_master = False
+        self.forced_master = self.is_master  # bypass grace period for cell creator
         self.forced_song: str | None = None
         self.last_pick_time = 0
         self.current_song = "Ninguna"
@@ -335,6 +335,7 @@ class NodeDaemon:
                         if self.is_master:
                             self.logger.warning("Otro Master con mejor score detectado. Rindiendo...")
                             self.is_master = False
+                            self.forced_master = False
                             self.streamer.stop()
                             self.client_restart_pending = True
                             continue
@@ -355,6 +356,7 @@ class NodeDaemon:
                             self.logger.info("Rindiendo ante Master con mejor score.")
                             with self.lock:
                                 self.is_master = False
+                                self.forced_master = False
                                 self.client_restart_pending = True
                             continue
                         else:

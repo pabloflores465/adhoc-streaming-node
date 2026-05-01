@@ -96,6 +96,8 @@ if [ -z "$BEST_BSSID" ]; then
     DELAY=$(( (RANDOM % 12) + 3 ))
     echo "[ON] Sin redes en rango. Esperando ${DELAY}s y reescaneando..."
     sleep "$DELAY"
+    iw dev "$IFACE" scan ap-force 2>/dev/null || iw dev "$IFACE" scan 2>/dev/null || true
+    sleep 3
     SCAN_RESULTS2=$(iw dev "$IFACE" scan dump 2>/dev/null | awk -v ssid="$SSID" '
         /^BSS /   { bssid=$2; gsub(/\(.*/, "", bssid); freq=""; signal="" }
         /^\tfreq:/   { freq=int($2) }
