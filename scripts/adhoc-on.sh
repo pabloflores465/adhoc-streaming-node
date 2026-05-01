@@ -162,10 +162,11 @@ echo "     Para apagar: sudo $(dirname "$0")/adhoc-off.sh"
 echo ""
 ip addr show "$IFACE"
 
-# Arrancar el daemon si está instalado
+# Arrancar (o reiniciar) el daemon para cargar el código recién sincronizado
 if systemctl list-unit-files adhoc-node.service &>/dev/null; then
-    echo "[ON] Arrancando adhoc-node.service..."
-    systemctl start adhoc-node.service && echo "[ON] Daemon arrancado. Dashboard: http://${FIXED_IP}:8080" \
+    echo "[ON] Reiniciando adhoc-node.service (cargando código actualizado)..."
+    systemctl restart adhoc-node.service \
+        && echo "[ON] Daemon activo. Dashboard: http://${FIXED_IP}:8080" \
         || echo "[ON] ADVERTENCIA: el daemon no arrancó. Revisa: journalctl -u adhoc-node.service"
 else
     echo "[ON] (adhoc-node.service no instalado — omitiendo arranque de daemon)"
