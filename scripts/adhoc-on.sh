@@ -38,14 +38,8 @@ if [ -z "$IFACE" ]; then
 fi
 echo "[ON] Interfaz: $IFACE | SSID: $SSID | Freq: ${FREQ}MHz"
 
-# ─── IP fija derivada del último byte de la MAC (única por hardware) ───────
-_MAC_LAST=$(ip link show "$IFACE" 2>/dev/null | awk '/ether/{print $2}' | awk -F: '{print $6}' | head -1)
-[ -z "$_MAC_LAST" ] && _MAC_LAST=$(cut -c1-2 /etc/machine-id)
-DEC=$((16#$_MAC_LAST))
-LAST_OCTET=$(( (DEC % 240) + 10 ))
-FIXED_IP="${IP_PREFIX}.${LAST_OCTET}"
-
 mkdir -p /tmp/adhoc
+FIXED_IP=""  # se calcula después de entrar en modo IBSS (MAC sin randomización)
 
 # ─── Guardar conexión activa para restaurar después ────────────────────────
 CURRENT_CON=$(nmcli -t -f NAME,DEVICE con show --active 2>/dev/null \
@@ -127,6 +121,13 @@ fi
 ip link set "$IFACE" down
 iw dev "$IFACE" set type ibss
 ip link set "$IFACE" up
+
+# ─── IP fija desde la MAC hardware (leída en modo IBSS, sin randomización) ──
+_MAC_LAST=$(ip link show "$IFACE" 2>/dev/null | awk '/ether/{print $2}' | awk -F: '{print $6}' | head -1)
+[ -z "$_MAC_LAST" ] && _MAC_LAST=$(cut -c1-2 /etc/machine-id)
+DEC=$((16#$_MAC_LAST))
+LAST_OCTET=$(( (DEC % 240) + 10 ))
+FIXED_IP="${IP_PREFIX}.${LAST_OCTET}"
 
 if [ -n "$BEST_BSSID" ]; then
     echo "[ON] Uniéndose a red existente: $BEST_BSSID @ ${BEST_FREQ}MHz (${BEST_SIGNAL} dBm)"
