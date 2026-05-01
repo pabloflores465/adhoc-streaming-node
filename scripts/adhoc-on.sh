@@ -4,6 +4,22 @@
 # Para restaurar internet: sudo ./scripts/adhoc-off.sh
 set -euo pipefail
 
+# ─── Auto-sync del repo a /opt/adhoc-node/repo/ ────────────────────────────
+REPO_SRC="$(cd "$(dirname "$0")/.." && pwd)"
+REPO_DST="/opt/adhoc-node/repo"
+if [ -d "$REPO_DST" ]; then
+    echo "[ON] Sincronizando cambios -> $REPO_DST ..."
+    rsync -a --delete --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' \
+        "$REPO_SRC/" "$REPO_DST/"
+    SERVICE_SRC="$REPO_DST/systemd/adhoc-node.service"
+    SERVICE_DST="/etc/systemd/system/adhoc-node.service"
+    if [ -f "$SERVICE_SRC" ] && ! diff -q "$SERVICE_SRC" "$SERVICE_DST" &>/dev/null; then
+        cp "$SERVICE_SRC" "$SERVICE_DST"
+        systemctl daemon-reload
+        echo "[ON] Service file actualizado."
+    fi
+fi
+
 SSID="${ADHOC_SSID:-ADHOC-STREAM}"
 FREQ="${ADHOC_FREQ:-2412}"
 IP_PREFIX="${ADHOC_NET:-192.168.99}"
