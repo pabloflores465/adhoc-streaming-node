@@ -88,7 +88,10 @@ rsync -a --delete \
     "$REPO_ROOT/" "$INSTALL_ROOT/repo/"
 
 # ─── 5. Descarga de música ─────────────────────────────────────────────────
-echo "[+] Descargando/generando 25 canciones (max 90s)..."
+# Fuente: música sin copyright para uso educativo (Proyecto escolar AD-HOC Streaming Node)
+# Referencia YouTube: https://youtu.be/xuBbiiwO9Ow
+# Para usar una playlist completa: export YTDLP_PLAYLIST="<url-playlist>" antes de correr este script.
+echo "[+] Descargando 25 canciones vía yt-dlp (No Copyright)..."
 bash "$INSTALL_ROOT/repo/scripts/download-music.sh" "$INSTALL_ROOT/music"
 
 # ─── 6. Servicios systemd ──────────────────────────────────────────────────

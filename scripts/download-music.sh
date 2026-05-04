@@ -3,6 +3,11 @@ set -euo pipefail
 
 # download-music.sh — Descarga/genera 25 canciones <= 90s para el nodo.
 # Prioridad: yt-dlp (playlist CC) > wget URLs locales > generar con ffmpeg.
+#
+# Fuente principal de música (No Copyright / libre de derechos):
+#   Canal: https://youtu.be/xuBbiiwO9Ow
+#   Playlist completa: establece YTDLP_PLAYLIST al URL de la playlist del canal.
+#   Uso educativo — Proyecto escolar AD-HOC Streaming Node.
 
 MUSIC_DIR="${1:-/opt/adhoc-node/music}"
 MAX_DURATION=90
@@ -26,16 +31,23 @@ if command -v ffprobe >/dev/null 2>&1; then
     done
 fi
 
-# --- Método 1: yt-dlp desde playlist CC de YouTube ---
-YTDLP_PLAYLIST="${YTDLP_PLAYLIST:-}"
-if command -v yt-dlp >/dev/null 2>&1 && [ -n "$YTDLP_PLAYLIST" ]; then
-    echo "[MUSIC] Usando yt-dlp con playlist: $YTDLP_PLAYLIST"
-    cd "$MUSIC_DIR"
-    yt-dlp --no-playlist-reverse \
-        -x --audio-format mp3 --audio-quality 192K \
-        --max-downloads 25 \
-        -o "song_%(playlist_index)02d.%(ext)s" \
-        "$YTDLP_PLAYLIST" 2>/dev/null || true
+# --- Método 1: yt-dlp desde playlist/canal de YouTube (No Copyright) ---
+# Ref: https://youtu.be/xuBbiiwO9Ow — sustituye con la URL de la playlist completa
+# para obtener más variedad. yt-dlp selecciona 25 canciones en orden aleatorio.
+YTDLP_PLAYLIST="${YTDLP_PLAYLIST:-https://youtu.be/xuBbiiwO9Ow}"
+if command -v yt-dlp >/dev/null 2>&1; then
+    echo "[MUSIC] Usando yt-dlp: $YTDLP_PLAYLIST"
+    (
+        cd "$MUSIC_DIR"
+        yt-dlp \
+            --yes-playlist \
+            --playlist-random \
+            -x --audio-format mp3 --audio-quality 192K \
+            --match-filter "duration <= 300" \
+            --max-downloads 25 \
+            -o "song_%(autonumber)02d.%(ext)s" \
+            "$YTDLP_PLAYLIST" 2>/dev/null || true
+    )
 fi
 
 # --- Método 2: wget/curl desde URLs locales ---
