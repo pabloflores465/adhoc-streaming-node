@@ -34,8 +34,8 @@ IFACE = _detect_iface()
 MULTI_ADDR = os.environ.get("ADHOC_MULTI", "239.255.42.42")
 PORT = int(os.environ.get("ADHOC_PORT", "5004"))
 HEARTBEAT_PORT = PORT + 1
-BROADCAST_ADDR = "255.255.255.255"
 IP_PREFIX = os.environ.get("ADHOC_NET", "192.168.99")
+BROADCAST_ADDR = f"{IP_PREFIX}.255"
 
 NODE_ID = os.environ.get("NODE_ID", "unknown")
 
@@ -189,7 +189,8 @@ class AdhocManager:
 
             except socket.timeout:
                 continue
-            except Exception:
+            except Exception as e:
+                logger.warning("receiver_loop error inesperado: %s", e)
                 continue
 
     def cleanup_peers(self):
