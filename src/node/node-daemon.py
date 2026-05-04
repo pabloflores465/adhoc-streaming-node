@@ -374,7 +374,9 @@ class NodeDaemon:
                     continue
 
                 if self.is_master:
-                    if not self.streamer.is_running():
+                    with self.lock:
+                        has_forced = self.forced_song is not None
+                    if not self.streamer.is_running() or has_forced:
                         self._pick_and_stream()
                 else:
                     # Cliente: si hay pending y NO estamos pausados, reiniciar

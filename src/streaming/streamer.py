@@ -30,7 +30,7 @@ class Streamer:
         on_eof_callback: Optional[Callable[[], None]] = None,
     ):
         self.proc: Optional[subprocess.Popen] = None
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()
         self.current_song = "Ninguna"
         self.callback = song_change_callback
         self.on_eof = on_eof_callback
