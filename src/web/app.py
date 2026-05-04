@@ -91,7 +91,7 @@ DASHBOARD_HTML = """
       <span class="status-dot {% if current_song != 'Ninguna' %}dot-playing{% else %}dot-idle{% endif %}" id="status-dot"></span>
       Reproduciendo: <span id="current-song-label">{{ current_song }}</span>
     </p>
-    <audio id="player" controls></audio>
+    <audio id="player" controls preload="none"></audio>
     <p style="color:#555; font-size:.75rem; margin-top:.4rem" id="player-hint">
       {% if is_master %}Fuente: este nodo (master){% else %}Fuente: master de la red{% endif %}
     </p>
@@ -215,10 +215,10 @@ DASHBOARD_HTML = """
     }
     if (!src) return;
     if (audio.getAttribute('data-song') !== song) {
+      const wasPlaying = !audio.paused;
       audio.src = src;
       audio.setAttribute('data-song', song);
-      audio.load();
-      audio.play().catch(() => {});
+      if (wasPlaying) audio.play().catch(() => {});
     }
   }
 
@@ -291,12 +291,11 @@ DASHBOARD_HTML = """
     } catch(e) { /* red no disponible, intentar de nuevo */ }
   }
 
-  // Init audio on page load if song already playing
+  // Init: set audio src on load (preload=none so browser won't download until user presses play)
+  {% for nid, info in peers.items() %}
+    {% if info.is_master %}masterIp = "{{ info.ip }}";{% endif %}
+  {% endfor %}
   if (currentSong && currentSong !== 'Ninguna') {
-    // Find master IP from initial peers data
-    {% for nid, info in peers.items() %}
-      {% if info.is_master %}masterIp = "{{ info.ip }}";{% endif %}
-    {% endfor %}
     setAudioSrc(currentSong);
   }
 

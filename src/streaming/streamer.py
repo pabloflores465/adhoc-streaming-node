@@ -48,13 +48,21 @@ class Streamer:
     def _watchdog(self):
         """Espera a que el proceso termine y notifica EOF."""
         proc = None
+        start = time.time()
         with self.lock:
             proc = self.proc
         if proc:
-            proc.wait()
+            _, stderr_data = proc.communicate()
+            elapsed = time.time() - start
             with self.lock:
                 if self.proc is proc:
                     self.proc = None
+            if stderr_data:
+                tail = stderr_data.decode("utf-8", errors="replace").strip()[-600:]
+                if elapsed < 5:
+                    logger.error("ffmpeg terminó rápido (%.1fs). Stderr: %s", elapsed, tail)
+                else:
+                    logger.debug("ffmpeg stderr (últimas líneas): %s", tail)
             if self.on_eof:
                 self.on_eof()
 
@@ -74,7 +82,7 @@ class Streamer:
             self.proc = subprocess.Popen(
                 cmd,
                 stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
             )
             t = threading.Thread(target=self._watchdog, daemon=True)
             t.start()
