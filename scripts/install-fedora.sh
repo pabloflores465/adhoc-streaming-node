@@ -45,9 +45,12 @@ SYSTEM_PACKAGES=(
     python3-pip
     ffmpeg
     mpv
+    yt-dlp
     htop
     iperf3
     rsync
+    curl
+    wget
 )
 
 echo "[+] Instalando dependencias del sistema..."

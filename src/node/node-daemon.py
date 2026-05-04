@@ -88,9 +88,14 @@ class NodeDaemon:
         self.client_restart_pending = False
 
         webapp._daemon_state["status_fn"] = self.get_status
+        webapp._daemon_state["current_song_fn"] = self._get_current_song
         webapp._daemon_state["force_song_fn"] = self.force_song
         webapp._daemon_state["force_master_fn"] = self.force_master
         webapp._daemon_state["toggle_pause_fn"] = self.toggle_pause
+
+    def _get_current_song(self) -> str:
+        with self.lock:
+            return self.current_song
 
     def _extra_heartbeat(self) -> dict:
         with self.lock:

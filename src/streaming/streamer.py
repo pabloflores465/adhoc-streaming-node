@@ -17,8 +17,10 @@ from pathlib import Path
 from typing import List, Optional, Callable
 
 MUSIC_DIR = Path(os.environ.get("ADHOC_MUSIC", "/opt/adhoc-node/music"))
-MULTI_ADDR = os.environ.get("ADHOC_MULTI", "239.255.42.42")
 PORT = int(os.environ.get("ADHOC_PORT", "5004"))
+IP_PREFIX = os.environ.get("ADHOC_NET", "192.168.99")
+# Use subnet broadcast for streaming — multicast is unreliable in IBSS/ad-hoc mode
+STREAM_ADDR = f"{IP_PREFIX}.255"
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +79,7 @@ class Streamer:
                 "ffmpeg", "-re", "-i", source,
                 "-c:a", "libmp3lame", "-b:a", "192k",
                 "-f", "mpegts",
-                f"udp://{MULTI_ADDR}:{PORT}?ttl=1&pkt_size=1316"
+                f"udp://{STREAM_ADDR}:{PORT}?broadcast=1&pkt_size=1316"
             ]
             self.proc = subprocess.Popen(
                 cmd,
@@ -105,9 +107,8 @@ class Streamer:
                 self.callback(self.current_song)
 
             player = os.environ.get("ADHOC_PLAYER", "mpv")
-            url = f"udp://{MULTI_ADDR}:{PORT}"
+            url = f"udp://0.0.0.0:{PORT}"  # receive broadcast/unicast on this port
             if subprocess.call(["which", player], stdout=subprocess.DEVNULL) == 0:
-                # Low-latency flags para mpv
                 cmd = [
                     player, "--no-cache", "--demuxer-readahead-secs=0",
                     "--cache-secs=0", "--no-video", url,
@@ -143,24 +144,20 @@ class Streamer:
     @staticmethod
     def sniff_multicast(timeout: float = 2.0) -> bool:
         """
-        Escucha el puerto multicast durante `timeout` segundos.
-        Devuelve True si detecta paquetes (otro Master activo).
-        Se debe llamar ANTES de iniciar el propio stream.
+        Escucha el puerto de stream durante `timeout` segundos.
+        Devuelve True si detecta paquetes UDP (otro Master activo).
         """
         try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
             try:
                 sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
             except (AttributeError, OSError):
                 pass
             sock.bind(("0.0.0.0", PORT))
-
-            mreq = struct.pack("4sl", socket.inet_aton(MULTI_ADDR), socket.INADDR_ANY)
-            sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
-
             sock.settimeout(timeout)
-            logger.debug("Sniffing multicast %s:%d por %.1fs...", MULTI_ADDR, PORT, timeout)
+            logger.debug("Sniffing stream UDP :%d por %.1fs...", PORT, timeout)
             try:
                 data, addr = sock.recvfrom(2048)
                 if data:
@@ -172,5 +169,5 @@ class Streamer:
             sock.close()
             return False
         except Exception as e:
-            logger.error("Error en sniff_multicast: %s", e)
+            logger.error("Error en sniff_stream: %s", e)
             return False

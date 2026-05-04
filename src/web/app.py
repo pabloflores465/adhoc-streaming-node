@@ -22,6 +22,7 @@ _daemon_state = {
     "current_song": "Ninguna",
     "peers": {},
     "status_fn": None,
+    "current_song_fn": None,
     "force_song_fn": None,
     "force_master_fn": None,
     "toggle_pause_fn": None,
@@ -353,10 +354,12 @@ def api_toggle_pause():
 @app.route("/stream")
 def stream_audio():
     """Sirve la canción actual como HTTP audio para el player del browser."""
-    if not _daemon_state["status_fn"]:
+    if _daemon_state.get("current_song_fn"):
+        song = _daemon_state["current_song_fn"]()
+    elif _daemon_state["status_fn"]:
+        song = _daemon_state["status_fn"]().get("current_song", "Ninguna")
+    else:
         abort(503)
-    status = _daemon_state["status_fn"]()
-    song = status.get("current_song", "Ninguna")
     if not song or song in ("Ninguna",) or song.startswith("Stream multicast"):
         abort(404)
 

@@ -1,12 +1,28 @@
-# music-urls.txt — URLs directas a archivos MP3/OGG de música Creative Commons.
-# Líneas que empiezan con # se ignoran.
-#
-# Ejemplos de fuentes conocidas (verificar disponibilidad antes del examen):
-# https://files.freemusicarchive.org/storage-freemusicarchive-org/music/ccCommunity/...
-#
-# Para usar yt-dlp en su lugar, define la variable de entorno:
-#   YTDLP_PLAYLIST="https://www.youtube.com/playlist?list=XXXXXX"
-# y asegúrate de que la playlist contenga música Creative Commons.
-#
-# Si este archivo está vacío o todas las URLs fallan, el script genera
-# pistas de prueba automáticamente con ffmpeg.
+# music-urls.txt — URLs directas a archivos MP3 de música libre de derechos.
+# Fuente: SoundHelix (libre de derechos, uso libre)
+# Fuente: Wikimedia Commons (dominio público / CC0)
+https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3
+https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3
+https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3
+https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3
+https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3
+https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3
+https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3
+https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3
+https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3
+https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3
+https://www.soundhelix.com/examples/mp3/SoundHelix-Song-11.mp3
+https://www.soundhelix.com/examples/mp3/SoundHelix-Song-12.mp3
+https://www.soundhelix.com/examples/mp3/SoundHelix-Song-13.mp3
+https://www.soundhelix.com/examples/mp3/SoundHelix-Song-14.mp3
+https://www.soundhelix.com/examples/mp3/SoundHelix-Song-15.mp3
+https://www.soundhelix.com/examples/mp3/SoundHelix-Song-16.mp3
+https://upload.wikimedia.org/wikipedia/commons/4/4e/BWV_543-fugue.ogg
+https://upload.wikimedia.org/wikipedia/commons/6/6e/Grieg_-_In_the_Hall_of_the_Mountain_King.ogg
+https://upload.wikimedia.org/wikipedia/commons/2/23/Ode_an_die_Freude_by_Beethoven.ogg
+https://upload.wikimedia.org/wikipedia/commons/b/b4/Moonlight_Sonata_-_Opening.ogg
+https://upload.wikimedia.org/wikipedia/commons/9/9b/Clair_de_Lune_by_Claude_Debussy.ogg
+https://upload.wikimedia.org/wikipedia/commons/7/7e/Chopin_-_Nocturne_op_9_no_1.ogg
+https://upload.wikimedia.org/wikipedia/commons/a/a9/Vivaldi_-_Spring_mvt_1_Allegro_-_John_Harrison_violin.ogg
+https://upload.wikimedia.org/wikipedia/commons/5/5c/Johann_Sebastian_Bach_-_Air.ogg
+https://upload.wikimedia.org/wikipedia/commons/8/8c/Prelude_and_Fugue_in_C_major_BWV_553_-_Fugue.ogg
