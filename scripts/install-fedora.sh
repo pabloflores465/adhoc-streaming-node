@@ -27,10 +27,14 @@ echo "[+] Interfaz inalámbrica detectada: $IFACE"
 FEDORA_VERSION=$(rpm -E %fedora)
 echo "[+] Detectado Fedora $FEDORA_VERSION"
 
-# ─── 1. Habilitar rpmfusion-free (ffmpeg completo con libmp3lame) ──────────
+# ─── 1. Habilitar RPM Fusion (free + nonfree) para codecs completos ────────
 if ! rpm -qa | grep -q rpmfusion-free-release; then
     echo "[+] Habilitando repositorio rpmfusion-free..."
     dnf install -y "https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-${FEDORA_VERSION}.noarch.rpm"
+fi
+if ! rpm -qa | grep -q rpmfusion-nonfree-release; then
+    echo "[+] Habilitando repositorio rpmfusion-nonfree..."
+    dnf install -y "https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-${FEDORA_VERSION}.noarch.rpm"
 fi
 
 # ─── 2. Dependencias del sistema ───────────────────────────────────────────
@@ -48,6 +52,22 @@ SYSTEM_PACKAGES=(
 
 echo "[+] Instalando dependencias del sistema..."
 dnf install -y "${SYSTEM_PACKAGES[@]}"
+
+# ─── 2b. Codecs de audio ───────────────────────────────────────────────────
+# GStreamer: base + good (OGG/FLAC/WAV) + bad-free + ugly (MP3/AAC, RPM Fusion)
+# lame: codificación MP3   flac: codec FLAC nativo
+AUDIO_CODEC_PACKAGES=(
+    gstreamer1-plugins-base
+    gstreamer1-plugins-good
+    gstreamer1-plugins-bad-free
+    gstreamer1-plugins-ugly
+    gstreamer1-libav
+    lame
+    flac
+)
+
+echo "[+] Instalando codecs de audio..."
+dnf install -y "${AUDIO_CODEC_PACKAGES[@]}"
 
 # ─── 3. Entorno Python declarativo ─────────────────────────────────────────
 echo "[+] Creando virtualenv en $VENV..."

@@ -154,14 +154,26 @@ class AdhocManager:
                 msg_type = msg.get("type")
 
                 if msg_type == "heartbeat" and msg.get("node_id") != NODE_ID:
+                    nid = msg["node_id"]
+                    peer_ip = msg.get("ip", addr[0])
+                    peer_master = msg.get("is_master", False)
+                    peer_score = msg.get("score", 0)
                     with self.lock:
-                        self.peers[msg["node_id"]] = {
-                            "ip": msg.get("ip", addr[0]),
-                            "score": msg.get("score", 0),
+                        is_new = nid not in self.peers
+                        prev_master = self.peers.get(nid, {}).get("is_master")
+                        self.peers[nid] = {
+                            "ip": peer_ip,
+                            "score": peer_score,
                             "songs": msg.get("songs", []),
-                            "is_master": msg.get("is_master", False),
+                            "is_master": peer_master,
                             "last_seen": time.time(),
                         }
+                    if is_new:
+                        logger.info("Peer descubierto: %s ip=%s score=%d master=%s",
+                                    nid, peer_ip, peer_score, peer_master)
+                    elif prev_master != peer_master:
+                        logger.info("Peer %s cambió master: %s -> %s (score=%d)",
+                                    nid, prev_master, peer_master, peer_score)
 
                 elif msg_type == "ip_reassign" and msg.get("target_node_id") == NODE_ID:
                     new_ip = msg.get("new_ip")
@@ -185,6 +197,7 @@ class AdhocManager:
         with self.lock:
             dead = [nid for nid, info in self.peers.items() if now - info["last_seen"] > 15]
             for nid in dead:
+                logger.info("Peer perdido (timeout): %s", nid)
                 del self.peers[nid]
 
     def am_i_master(self, force_master: bool = False) -> bool:

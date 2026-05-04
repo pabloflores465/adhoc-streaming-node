@@ -31,7 +31,7 @@ fi
 ip link set "$IFACE" up 2>/dev/null || true
 
 # Escaneo activo + espera para obtener resultados frescos en modo IBSS
-iw dev "$IFACE" scan ap-force 2>/dev/null || iw dev "$IFACE" scan 2>/dev/null || true
+iw dev "$IFACE" scan ap-force > /dev/null 2>&1 || iw dev "$IFACE" scan > /dev/null 2>&1 || true
 sleep 3
 
 # Parsear resultados (freq convertida a entero para compatibilidad con ibss join)
