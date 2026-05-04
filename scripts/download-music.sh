@@ -12,6 +12,20 @@ mkdir -p "$MUSIC_DIR"
 
 echo "[MUSIC] Objetivo: 25 canciones en $MUSIC_DIR (max ${MAX_DURATION}s)"
 
+# Limpiar archivos inválidos (duración 0 o corruptos) antes de contar
+if command -v ffprobe >/dev/null 2>&1; then
+    echo "[MUSIC] Verificando archivos existentes..."
+    for f in "$MUSIC_DIR"/*.mp3 "$MUSIC_DIR"/*.ogg "$MUSIC_DIR"/*.m4a 2>/dev/null; do
+        [ -f "$f" ] || continue
+        dur=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$f" 2>/dev/null || echo "0")
+        # remove if duration is 0, empty, or less than 5 seconds
+        if awk "BEGIN{exit !($dur+0 < 5)}"; then
+            echo "[MUSIC] Eliminando archivo inválido/dummy: $(basename "$f")"
+            rm -f "$f"
+        fi
+    done
+fi
+
 # --- Método 1: yt-dlp desde playlist CC de YouTube ---
 YTDLP_PLAYLIST="${YTDLP_PLAYLIST:-}"
 if command -v yt-dlp >/dev/null 2>&1 && [ -n "$YTDLP_PLAYLIST" ]; then
