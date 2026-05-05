@@ -106,22 +106,28 @@ class Streamer:
             if self.callback:
                 self.callback(self.current_song)
 
-            player = os.environ.get("ADHOC_PLAYER", "mpv")
-            url = f"udp://0.0.0.0:{PORT}"  # receive broadcast/unicast on this port
-            if subprocess.call(["which", player], stdout=subprocess.DEVNULL) == 0:
+            # ffplay recibe mejor UDP broadcast en IBSS que mpv. Usamos @:PORT
+            # para bind explícito local, con buffers grandes para evitar cortes.
+            player = os.environ.get("ADHOC_PLAYER", "ffplay")
+            ff_url = f"udp://@:{PORT}?fifo_size=1000000&overrun_nonfatal=1"
+            mpv_url = f"udp://0.0.0.0:{PORT}"
+            if player == "mpv" and subprocess.call(["which", "mpv"], stdout=subprocess.DEVNULL) == 0:
                 cmd = [
-                    player, "--no-cache", "--demuxer-readahead-secs=0",
-                    "--cache-secs=0", "--no-video", url,
+                    "mpv", "--no-cache", "--demuxer-readahead-secs=0",
+                    "--cache-secs=0", "--untimed", "--no-video", mpv_url,
                 ]
             else:
                 cmd = [
-                    "ffplay", "-fflags", "+nobuffer", "-flags", "low_delay",
-                    "-nodisp", "-autoexit", url,
+                    "ffplay", "-hide_banner", "-loglevel", "warning",
+                    "-fflags", "nobuffer", "-flags", "low_delay",
+                    "-probesize", "32", "-analyzeduration", "0",
+                    "-nodisp", "-i", ff_url,
                 ]
+            logger.info("Comando cliente stream: %s", " ".join(cmd))
             self.proc = subprocess.Popen(
                 cmd,
                 stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
             )
             t = threading.Thread(target=self._watchdog, daemon=True)
             t.start()
