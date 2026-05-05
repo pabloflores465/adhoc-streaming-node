@@ -72,6 +72,10 @@ _assign_ip_and_exit() {
     # interfaz en IBSS pero responde "Destination Host Unreachable" al hacer ARP.
     ip route replace "${IP_PREFIX}.0/24" dev "$IFACE" src "$FIXED_IP" scope link 2>/dev/null || true
     iw dev "$IFACE" set power_save off 2>/dev/null || true
+    ip neigh flush dev "$IFACE" 2>/dev/null || true
+    sysctl -w net.ipv4.conf."$IFACE".arp_filter=0 >/dev/null 2>&1 || true
+    sysctl -w net.ipv4.conf."$IFACE".arp_ignore=0 >/dev/null 2>&1 || true
+    sysctl -w net.ipv4.conf."$IFACE".arp_announce=0 >/dev/null 2>&1 || true
     sysctl -w net.ipv4.conf."$IFACE".rp_filter=0 >/dev/null 2>&1 || true
     sysctl -w net.ipv4.conf.all.rp_filter=0 >/dev/null 2>&1 || true
     echo "$FIXED_IP" > /tmp/adhoc/my_ip
@@ -177,6 +181,10 @@ else
     fi
     ip route replace "${IP_PREFIX}.0/24" dev "$IFACE" src "$FIXED_IP" scope link 2>/dev/null || true
     iw dev "$IFACE" set power_save off 2>/dev/null || true
+    ip neigh flush dev "$IFACE" 2>/dev/null || true
+    sysctl -w net.ipv4.conf."$IFACE".arp_filter=0 >/dev/null 2>&1 || true
+    sysctl -w net.ipv4.conf."$IFACE".arp_ignore=0 >/dev/null 2>&1 || true
+    sysctl -w net.ipv4.conf."$IFACE".arp_announce=0 >/dev/null 2>&1 || true
     sysctl -w net.ipv4.conf."$IFACE".rp_filter=0 >/dev/null 2>&1 || true
     sysctl -w net.ipv4.conf.all.rp_filter=0 >/dev/null 2>&1 || true
     echo "$FIXED_IP" > /tmp/adhoc/my_ip

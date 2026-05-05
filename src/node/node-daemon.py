@@ -392,6 +392,30 @@ class NodeDaemon:
             except Exception:
                 self.logger.exception("Error persistiendo estado")
 
+    def _connectivity_keepalive_loop(self):
+        """Mantiene ARP/rutas vivas entre peers.
+
+        En IBSS/Fedora hemos visto conectividad asimétrica: los heartbeats llegan,
+        pero TCP/HTTP falla hasta que un lado hace ping. Este loop fuerza tráfico
+        unicast ligero hacia cada peer para poblar la tabla ARP en ambos lados.
+        """
+        while True:
+            time.sleep(5)
+            try:
+                peers = self.net.get_peers_snapshot()
+                for info in peers.values():
+                    ip = info.get("ip", "")
+                    if not ip or ip == "0.0.0.0":
+                        continue
+                    subprocess.run(
+                        ["ping", "-c", "1", "-W", "1", ip],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        timeout=2,
+                    )
+            except Exception:
+                self.logger.debug("Keepalive de conectividad falló", exc_info=True)
+
     def _rejoin_loop(self):
         script = f"{REPO_ROOT}/scripts/network-rejoin.sh"
         while True:
@@ -506,6 +530,7 @@ class NodeDaemon:
             threading.Thread(target=self._peer_cache_loop,   daemon=True, name="peer-cache"),
             threading.Thread(target=self._ip_conflict_loop,  daemon=True, name="ip-conflict"),
             threading.Thread(target=self._state_persist_loop,daemon=True, name="state-persist"),
+            threading.Thread(target=self._connectivity_keepalive_loop, daemon=True, name="connectivity-keepalive"),
             threading.Thread(target=self._rejoin_loop,       daemon=True, name="rejoin"),
             threading.Thread(target=self._master_logic,      daemon=True, name="master-logic"),
             threading.Thread(target=self._web_loop,          daemon=True, name="web"),
