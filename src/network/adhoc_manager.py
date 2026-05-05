@@ -34,6 +34,9 @@ IFACE = _detect_iface()
 MULTI_ADDR = os.environ.get("ADHOC_MULTI", "239.255.42.42")
 PORT = int(os.environ.get("ADHOC_PORT", "5004"))
 HEARTBEAT_PORT = PORT + 1
+# Un peer se considera desconectado si no manda heartbeats en este tiempo.
+# Los heartbeats salen cada 3s; 9s permite perder 2 paquetes sin dejar nodos fantasma.
+PEER_TIMEOUT = float(os.environ.get("ADHOC_PEER_TIMEOUT", "9"))
 IP_PREFIX = os.environ.get("ADHOC_NET", "192.168.99")
 BROADCAST_ADDR = f"{IP_PREFIX}.255"
 
@@ -193,13 +196,20 @@ class AdhocManager:
                 logger.warning("receiver_loop error inesperado: %s", e)
                 continue
 
+    def _prune_stale_peers_locked(self, now: Optional[float] = None):
+        """Elimina peers que ya no envían heartbeats. Requiere self.lock tomado."""
+        now = now or time.time()
+        dead = [
+            nid for nid, info in self.peers.items()
+            if now - info.get("last_seen", 0) > PEER_TIMEOUT
+        ]
+        for nid in dead:
+            logger.info("Peer perdido (timeout %.0fs): %s", PEER_TIMEOUT, nid)
+            del self.peers[nid]
+
     def cleanup_peers(self):
-        now = time.time()
         with self.lock:
-            dead = [nid for nid, info in self.peers.items() if now - info["last_seen"] > 15]
-            for nid in dead:
-                logger.info("Peer perdido (timeout): %s", nid)
-                del self.peers[nid]
+            self._prune_stale_peers_locked()
 
     def am_i_master(self, force_master: bool = False) -> bool:
         if force_master:
@@ -297,5 +307,11 @@ class AdhocManager:
         t_recv.start()
 
     def get_peers_snapshot(self) -> Dict[str, Any]:
+        """Devuelve peers activos, purgando antes los desconectados.
+
+        Esto evita que la API/web siga mostrando nodos que salieron hasta que
+        corra el hilo periódico de cleanup.
+        """
         with self.lock:
-            return dict(self.peers)
+            self._prune_stale_peers_locked()
+            return {nid: dict(info) for nid, info in self.peers.items()}

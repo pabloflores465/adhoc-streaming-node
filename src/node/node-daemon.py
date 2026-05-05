@@ -30,6 +30,8 @@ import random
 import logging
 import logging.handlers
 import subprocess
+import urllib.request
+import shutil
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -44,6 +46,7 @@ NODE_ID = os.environ.get("NODE_ID", "unknown")
 MASTER_PICK_INTERVAL = 0
 REJOIN_INTERVAL = 60
 REPO_ROOT = "/opt/adhoc-node/repo"
+PEER_CACHE_DIR = Path(os.environ.get("ADHOC_PEER_CACHE", "/opt/adhoc-node/state/peer-cache"))
 
 
 def setup_logging():
@@ -86,6 +89,9 @@ class NodeDaemon:
         self.paused = False
         self.lock = threading.Lock()
         self.client_restart_pending = False
+        # Cache privado del master: (node_id, song) -> path descargado.
+        # Solo se usa mientras ese peer siga conectado.
+        self.peer_song_cache: dict[tuple[str, str], Path] = {}
 
         webapp._daemon_state["status_fn"] = self.get_status
         webapp._daemon_state["current_song_fn"] = self._get_current_song
@@ -132,10 +138,42 @@ class NodeDaemon:
         peers = self.net.get_peers_snapshot()
         for nid, info in peers.items():
             if song_name in info.get("songs", []):
+                cached = self.peer_song_cache.get((nid, song_name))
+                if cached and cached.exists():
+                    # Cache válido solo porque el peer todavía está conectado.
+                    return (cached, None)
                 peer_ip = info.get("ip")
                 if peer_ip and peer_ip != "0.0.0.0":
                     return (None, peer_ip)
         return (None, None)
+
+    def _safe_song_name(self, song_name: str) -> bool:
+        return bool(song_name) and "/" not in song_name and ".." not in song_name
+
+    def _download_peer_song(self, nid: str, peer_ip: str, song_name: str):
+        """Descarga al cache privado del master una canción de un peer conectado."""
+        if not self._safe_song_name(song_name) or not peer_ip or peer_ip == "0.0.0.0":
+            return
+        dest_dir = PEER_CACHE_DIR / nid
+        dest = dest_dir / song_name
+        if dest.exists():
+            self.peer_song_cache[(nid, song_name)] = dest
+            return
+        tmp = dest.with_suffix(dest.suffix + ".tmp")
+        url = f"http://{peer_ip}:8080/music/{song_name}"
+        try:
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            self.logger.info("Master descargando inventario de %s: %s", nid, song_name)
+            req = urllib.request.Request(url, headers={"User-Agent": "adhoc-node/1.0"})
+            with urllib.request.urlopen(req, timeout=45) as resp, open(tmp, "wb") as f:
+                shutil.copyfileobj(resp, f)
+            tmp.rename(dest)
+            self.peer_song_cache[(nid, song_name)] = dest
+            self.logger.info("Cache de peer listo: %s/%s", nid, song_name)
+        except Exception as e:
+            if tmp.exists():
+                tmp.unlink()
+            self.logger.warning("No se pudo descargar %s de %s (%s): %s", song_name, nid, peer_ip, e)
 
     def _another_master_with_higher_score(self) -> bool:
         """Detecta si hay otro Master conocido con mejor score que nosotros."""
@@ -227,7 +265,11 @@ class NodeDaemon:
             peer_ip = info.get("ip")
             if peer_ip and peer_ip != "0.0.0.0":
                 for song_name in info.get("songs", []):
-                    all_songs.append((song_name, None, peer_ip))
+                    cached = self.peer_song_cache.get((nid, song_name))
+                    if cached and cached.exists():
+                        all_songs.append((song_name, cached, None))
+                    else:
+                        all_songs.append((song_name, None, peer_ip))
 
         if not all_songs:
             self.logger.warning("No hay canciones disponibles en la red")
@@ -261,6 +303,39 @@ class NodeDaemon:
                 self.net.cleanup_peers()
             except Exception:
                 self.logger.exception("Error en cleanup de peers")
+
+    def _peer_cache_loop(self):
+        """Si somos master, precarga canciones de peers conectados.
+
+        El cache no se anuncia como música local y solo se usa si el peer dueño
+        sigue apareciendo en los heartbeats activos.
+        """
+        while True:
+            time.sleep(5)
+            try:
+                with self.lock:
+                    master = self.is_master
+                if not master:
+                    continue
+                peers = self.net.get_peers_snapshot()
+                active_keys = set()
+                for nid, info in peers.items():
+                    peer_ip = info.get("ip", "")
+                    for song_name in info.get("songs", []):
+                        active_keys.add((nid, song_name))
+                        if (nid, song_name) not in self.peer_song_cache:
+                            threading.Thread(
+                                target=self._download_peer_song,
+                                args=(nid, peer_ip, song_name),
+                                daemon=True,
+                                name=f"cache-{nid[:6]}-{song_name[:16]}",
+                            ).start()
+                # Importante: si el peer se desconecta, dejamos de usar su cache.
+                for key in list(self.peer_song_cache.keys()):
+                    if key not in active_keys:
+                        self.peer_song_cache.pop(key, None)
+            except Exception:
+                self.logger.exception("Error en cache de canciones de peers")
 
     def _ip_conflict_loop(self):
         while True:
@@ -417,6 +492,7 @@ class NodeDaemon:
         threads = [
             threading.Thread(target=self._heartbeat_loop,    daemon=True, name="heartbeat"),
             threading.Thread(target=self._cleanup_loop,      daemon=True, name="cleanup"),
+            threading.Thread(target=self._peer_cache_loop,   daemon=True, name="peer-cache"),
             threading.Thread(target=self._ip_conflict_loop,  daemon=True, name="ip-conflict"),
             threading.Thread(target=self._state_persist_loop,daemon=True, name="state-persist"),
             threading.Thread(target=self._rejoin_loop,       daemon=True, name="rejoin"),
