@@ -413,6 +413,13 @@ class NodeDaemon:
                         stderr=subprocess.DEVNULL,
                         timeout=2,
                     )
+                    # TCP corto al web del peer/master para calentar ARP + ruta
+                    # del mismo camino que usa la UI/audio HTTP.
+                    try:
+                        with urllib.request.urlopen(f"http://{ip}:8080/api/status", timeout=1.0) as resp:
+                            resp.read(64)
+                    except Exception:
+                        pass
             except Exception:
                 self.logger.debug("Keepalive de conectividad falló", exc_info=True)
 

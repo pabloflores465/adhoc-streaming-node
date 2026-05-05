@@ -124,15 +124,28 @@ class AdhocManager:
         if self.extra_heartbeat_fn:
             msg.update(self.extra_heartbeat_fn())
         payload = json.dumps(msg).encode("utf-8")
-        try:
-            self.sock.sendto(payload, (BROADCAST_ADDR, self.port))
-            self.sock.sendto(payload, (MULTI_ADDR, self.port))
-        except OSError as e:
-            # ENETUNREACH (101) es normal cuando no hay carrier/peers todavía en IBSS
-            if e.errno == 101:
-                logger.debug("Heartbeat: sin carrier aún (IBSS sin peers)")
-            else:
-                logger.warning("Error enviando heartbeat: %s", e)
+        targets = [(BROADCAST_ADDR, self.port), (MULTI_ADDR, self.port)]
+        # En IBSS algunos drivers/Fedora entregan broadcast de forma asimétrica.
+        # Si ya conocemos algún peer, también mandamos heartbeat unicast para que
+        # el otro lado nos vea sin depender de ping manual/ARP casual.
+        with self.lock:
+            for info in self.peers.values():
+                peer_ip = info.get("ip")
+                if peer_ip and peer_ip != "0.0.0.0":
+                    targets.append((peer_ip, self.port))
+        sent_any = False
+        for target in targets:
+            try:
+                self.sock.sendto(payload, target)
+                sent_any = True
+            except OSError as e:
+                # ENETUNREACH (101) es normal cuando no hay carrier/peers todavía en IBSS
+                if e.errno == 101:
+                    logger.debug("Heartbeat: sin ruta hacia %s", target[0])
+                else:
+                    logger.debug("Error enviando heartbeat a %s: %s", target[0], e)
+        if not sent_any:
+            logger.debug("No se pudo enviar heartbeat a ningún destino")
 
     def receiver_loop(self):
         if self.sock is None:
@@ -161,6 +174,24 @@ class AdhocManager:
                     peer_ip = msg.get("ip", addr[0])
                     peer_master = msg.get("is_master", False)
                     peer_score = msg.get("score", 0)
+                    # Respuesta unicast inmediata: ayuda a que el emisor nos
+                    # descubra aunque los broadcasts sean asimétricos en IBSS.
+                    if not msg.get("reply"):
+                        try:
+                            reply = {
+                                "type": "heartbeat",
+                                "node_id": NODE_ID,
+                                "timestamp": time.time(),
+                                "score": self._my_score(),
+                                "ip": self._get_my_ip(),
+                                "is_master": False,
+                                "reply": True,
+                            }
+                            if self.extra_heartbeat_fn:
+                                reply.update(self.extra_heartbeat_fn())
+                            self.sock.sendto(json.dumps(reply).encode("utf-8"), (peer_ip, self.port))
+                        except Exception:
+                            logger.debug("No se pudo responder heartbeat unicast a %s", peer_ip, exc_info=True)
                     with self.lock:
                         is_new = nid not in self.peers
                         prev_master = self.peers.get(nid, {}).get("is_master")
