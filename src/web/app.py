@@ -96,6 +96,10 @@ DASHBOARD_HTML = """
       Reproduciendo: <span id="current-song-label">{{ current_song }}</span>
     </p>
     <audio id="player" controls preload="none"></audio>
+    <div style="margin-top:.5rem">
+      <button type="button" id="play-browser-btn" class="btn-pause">▶ Reproducir en este navegador</button>
+      <span id="player-status" style="color:#fa0;font-size:.8rem;margin-left:.5rem"></span>
+    </div>
     <p style="color:#555; font-size:.75rem; margin-top:.4rem" id="player-hint">
       {% if is_master %}Fuente: este nodo (master){% else %}Fuente: master de la red{% endif %}
     </p>
@@ -216,6 +220,9 @@ DASHBOARD_HTML = """
   const songLabel = document.getElementById('current-song-label');
   const statusDot = document.getElementById('status-dot');
   const dlStatus  = document.getElementById('dl-status');
+  const playBtn   = document.getElementById('play-browser-btn');
+  const playerStatus = document.getElementById('player-status');
+  let userWantsPlay = false;
 
   // Init master IP from server-rendered peers
   {% for nid, info in peers.items() %}
@@ -228,6 +235,16 @@ DASHBOARD_HTML = """
     return '';
   }
 
+  async function tryPlay() {
+    if (!audio.src) return;
+    try {
+      await audio.play();
+      playerStatus.textContent = 'Sonando';
+    } catch (e) {
+      playerStatus.textContent = 'Pulsa ▶ para escuchar (Firefox bloqueó autoplay)';
+    }
+  }
+
   function reloadPlayer(song) {
     const src = streamUrl();
     if (!src) return;
@@ -235,17 +252,21 @@ DASHBOARD_HTML = """
     audio.src = src + '?t=' + Date.now();
     audio.setAttribute('data-song', song);
     audio.load();
-    audio.play().catch(() => {});
+    if (userWantsPlay) tryPlay();
+    else playerStatus.textContent = 'Pulsa ▶ para escuchar';
   }
 
   function setAudioSrcIfChanged(song) {
     const src = streamUrl();
     if (!src) return;
-    if (audio.getAttribute('data-song') !== song) {
-      const wasPlaying = !audio.paused;
-      audio.src = src;
-      audio.setAttribute('data-song', song);
-      if (wasPlaying) audio.play().catch(() => {});
+    const key = song + '|' + src;
+    if (audio.getAttribute('data-song') !== key) {
+      const wasPlaying = !audio.paused || userWantsPlay;
+      audio.src = src + (src.includes('?') ? '&' : '?') + 't=' + Date.now();
+      audio.setAttribute('data-song', key);
+      audio.load();
+      if (wasPlaying) tryPlay();
+      else playerStatus.textContent = 'Pulsa ▶ para escuchar';
     }
   }
 
@@ -333,6 +354,16 @@ DASHBOARD_HTML = """
     setTimeout(() => { dlStatus.textContent = ''; }, 3000);
   }
 
+  playBtn.addEventListener('click', () => {
+    userWantsPlay = true;
+    if (currentSong && currentSong !== 'Ninguna') setAudioSrcIfChanged(currentSong);
+    tryPlay();
+  });
+
+  audio.addEventListener('play', () => { userWantsPlay = true; playerStatus.textContent = 'Sonando'; });
+  audio.addEventListener('pause', () => { if (!audio.ended) playerStatus.textContent = 'Pausado'; });
+  audio.addEventListener('error', () => { playerStatus.textContent = 'Error cargando audio del master'; });
+
   document.getElementById('force-form').addEventListener('submit', e => {
     e.preventDefault();
     const val = document.getElementById('force-input').value.trim();
@@ -398,8 +429,8 @@ DASHBOARD_HTML = """
           // Master changed song externally (next track, other node, etc.)
           currentSong = song;
           reloadPlayer(song);
-        } else if (!audio.getAttribute('data-song')) {
-          // First load — set src without forcing play
+        } else {
+          // First load, or master IP/source changed after page load.
           setAudioSrcIfChanged(song);
         }
       }
