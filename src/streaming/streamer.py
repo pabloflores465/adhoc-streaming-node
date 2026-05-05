@@ -99,10 +99,10 @@ class Streamer:
         self._start_server_common(url, song_name)
 
     def start_client(self):
-        logger.info("Iniciando cliente de stream en %s:%d", MULTI_ADDR, PORT)
+        logger.info("Iniciando cliente de stream en UDP broadcast :%d", PORT)
         with self.lock:
             self.stop()
-            self.current_song = f"Stream multicast {MULTI_ADDR}:{PORT}"
+            self.current_song = f"Stream UDP broadcast :{PORT}"
             if self.callback:
                 self.callback(self.current_song)
 
