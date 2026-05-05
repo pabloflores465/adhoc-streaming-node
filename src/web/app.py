@@ -205,9 +205,10 @@ DASHBOARD_HTML = """
 <script>
   const IS_MASTER = {{ 'true' if is_master else 'false' }};
   const NODE_ID   = "{{ node_id }}";
-  let currentSong = "{{ current_song }}";
-  let masterIp    = null;
-  let pendingSong  = null;
+  let currentSong      = "{{ current_song }}";
+  let masterIp         = null;
+  let pendingSong      = null;
+  let pendingTimer     = null;
 
   const audio     = document.getElementById('player');
   const songLabel = document.getElementById('current-song-label');
@@ -228,7 +229,8 @@ DASHBOARD_HTML = """
   function reloadPlayer(song) {
     const src = streamUrl();
     if (!src) return;
-    audio.src = src;
+    // Cache-bust so the browser always makes a new request even if base URL is identical
+    audio.src = src + '?t=' + Date.now();
     audio.setAttribute('data-song', song);
     audio.load();
     audio.play().catch(() => {});
@@ -276,8 +278,15 @@ DASHBOARD_HTML = """
     });
   }
 
-  async function requestSong(name, isLocal, peerIp) {
+  function setPending(name) {
     pendingSong = name;
+    if (pendingTimer) clearTimeout(pendingTimer);
+    // Auto-clear pending after 12s in case master never confirms
+    pendingTimer = setTimeout(() => { pendingSong = null; }, 12000);
+  }
+
+  async function requestSong(name, isLocal, peerIp) {
+    setPending(name);
     dlStatus.textContent = '';
 
     // If remote song, download it first
@@ -342,24 +351,30 @@ DASHBOARD_HTML = """
         if (info.is_master) { masterIp = info.ip; break; }
       }
 
-      // Update song label & dot
-      songLabel.textContent = song;
-      if (song && song !== 'Ninguna') {
-        statusDot.className = 'status-dot dot-playing';
-      } else {
-        statusDot.className = 'status-dot dot-idle';
+      // Update song label & dot (don't overwrite while a click is pending)
+      if (!pendingSong) {
+        songLabel.textContent = song;
+        statusDot.className = (song && song !== 'Ninguna')
+          ? 'status-dot dot-playing' : 'status-dot dot-idle';
       }
 
-      // Update audio when song changes (unless we already triggered it via click)
+      // Update audio based on what the master reports
       if (song && song !== 'Ninguna') {
-        if (song !== currentSong) {
-          currentSong = song;
-          if (song !== pendingSong) {
-            // Song changed externally (master switched) — reload player
-            reloadPlayer(song);
+        if (pendingSong) {
+          // We requested a change — ignore poll until master confirms it
+          if (song === pendingSong) {
+            clearTimeout(pendingTimer);
+            pendingSong = null;
+            currentSong = song;
+            // Don't reload — we already reloaded on click
           }
-          pendingSong = null;
+          // else: master hasn't switched yet, keep waiting
+        } else if (song !== currentSong) {
+          // Master changed song externally (next track, other node, etc.)
+          currentSong = song;
+          reloadPlayer(song);
         } else if (!audio.getAttribute('data-song')) {
+          // First load — set src without forcing play
           setAudioSrcIfChanged(song);
         }
       }
