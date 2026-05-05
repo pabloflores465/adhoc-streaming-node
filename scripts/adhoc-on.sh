@@ -4,6 +4,22 @@
 # Para restaurar internet: sudo ./scripts/adhoc-off.sh
 set -euo pipefail
 
+# Timeouts cortos para evitar que una tarjeta/driver defectuoso deje el script colgado.
+CMD_TIMEOUT="${ADHOC_CMD_TIMEOUT:-8}"
+SCAN_TIMEOUT="${ADHOC_SCAN_TIMEOUT:-10}"
+JOIN_TIMEOUT="${ADHOC_JOIN_TIMEOUT:-8}"
+
+run_t() {
+    local seconds="$1"
+    shift
+    timeout --foreground -k 2s "${seconds}s" "$@"
+}
+
+if [ "${EUID}" -ne 0 ]; then
+    echo "[!] Ejecuta como root: sudo $0"
+    exit 1
+fi
+
 # ─── Auto-sync del repo a /opt/adhoc-node/repo/ ────────────────────────────
 REPO_SRC="$(cd "$(dirname "$0")/.." && pwd)"
 REPO_DST="/opt/adhoc-node/repo"
@@ -42,30 +58,37 @@ mkdir -p /tmp/adhoc
 FIXED_IP=""  # se calcula después de entrar en modo IBSS (MAC sin randomización)
 
 # ─── Guardar conexión activa para restaurar después ────────────────────────
-CURRENT_CON=$(nmcli -t -f NAME,DEVICE con show --active 2>/dev/null \
+CURRENT_CON=$(run_t "$CMD_TIMEOUT" nmcli -t -f NAME,DEVICE con show --active 2>/dev/null \
     | grep ":${IFACE}$" | cut -d: -f1 || true)
 printf '%s' "${CURRENT_CON}" > /tmp/adhoc/nm_saved_connection
 echo "[ON] Conexión NM guardada: '${CURRENT_CON:-ninguna}'"
 
 # ─── Liberar interfaz de NetworkManager (solo en RAM, sin archivo conf.d) ──
 echo "[ON] Liberando $IFACE de NetworkManager..."
-nmcli device set "$IFACE" managed no 2>/dev/null || true
-nmcli device disconnect "$IFACE" 2>/dev/null || true
+run_t "$CMD_TIMEOUT" nmcli device set "$IFACE" managed no 2>/dev/null || true
+run_t "$CMD_TIMEOUT" nmcli device disconnect "$IFACE" 2>/dev/null || true
 sleep 1
 
 # ─── Limpiar estado anterior ────────────────────────────────────────────────
-ip link set "$IFACE" down 2>/dev/null || true
-ip addr flush dev "$IFACE" 2>/dev/null || true
-iw dev "$IFACE" ibss leave 2>/dev/null || true
-iw dev "$IFACE" set type managed 2>/dev/null || true
-ip link set "$IFACE" up
+run_t "$CMD_TIMEOUT" ip link set "$IFACE" down 2>/dev/null || true
+run_t "$CMD_TIMEOUT" ip addr flush dev "$IFACE" 2>/dev/null || true
+run_t "$CMD_TIMEOUT" iw dev "$IFACE" ibss leave 2>/dev/null || true
+run_t "$CMD_TIMEOUT" iw dev "$IFACE" set type managed 2>/dev/null || true
+if ! run_t "$CMD_TIMEOUT" ip link set "$IFACE" up; then
+    echo "[!] No se pudo activar $IFACE. Prueba otra interfaz: sudo ADHOC_IFACE=wlanX ./adhoc-on.sh"
+    exit 1
+fi
 
 # ─── Escanear redes AD-HOC existentes ──────────────────────────────────────
-echo "[ON] Escaneando redes '$SSID' (espera 4s)..."
-iw dev "$IFACE" scan ap-force 2>/dev/null || iw dev "$IFACE" scan 2>/dev/null || true
-sleep 4
+echo "[ON] Escaneando redes '$SSID' (máx ${SCAN_TIMEOUT}s; si falla, crea la red)..."
+SCAN_OK=1
+if ! run_t "$SCAN_TIMEOUT" iw dev "$IFACE" scan ap-force 2>/dev/null; then
+    run_t "$SCAN_TIMEOUT" iw dev "$IFACE" scan 2>/dev/null || SCAN_OK=0
+fi
+[ "$SCAN_OK" -eq 0 ] && echo "[ON] Escaneo no disponible/timeout; continuando sin bloquear."
+sleep 1
 
-SCAN_RESULTS=$(iw dev "$IFACE" scan dump 2>/dev/null | awk -v ssid="$SSID" '
+SCAN_RESULTS=$(run_t "$SCAN_TIMEOUT" iw dev "$IFACE" scan dump 2>/dev/null | awk -v ssid="$SSID" '
     /^BSS /   { bssid=$2; gsub(/\(.*/, "", bssid); freq=""; signal="" }
     /^\tfreq:/   { freq=int($2) }
     /^\tsignal:/ { signal=$2 }
@@ -92,13 +115,15 @@ done <<< "$SCAN_RESULTS"
 
 # ─── Si no se encontró red, esperar un tiempo aleatorio y reescanear ───────
 # Esto evita la condición de carrera cuando dos PCs arrancan simultáneamente.
-if [ -z "$BEST_BSSID" ]; then
-    DELAY=$(( (RANDOM % 12) + 3 ))
+if [ -z "$BEST_BSSID" ] && [ "$SCAN_OK" -eq 1 ]; then
+    DELAY=$(( (RANDOM % 5) + 1 ))
     echo "[ON] Sin redes en rango. Esperando ${DELAY}s y reescaneando..."
     sleep "$DELAY"
-    iw dev "$IFACE" scan ap-force 2>/dev/null || iw dev "$IFACE" scan 2>/dev/null || true
-    sleep 3
-    SCAN_RESULTS2=$(iw dev "$IFACE" scan dump 2>/dev/null | awk -v ssid="$SSID" '
+    if ! run_t "$SCAN_TIMEOUT" iw dev "$IFACE" scan ap-force 2>/dev/null; then
+        run_t "$SCAN_TIMEOUT" iw dev "$IFACE" scan 2>/dev/null || echo "[ON] Segundo escaneo no disponible/timeout; crearé la red."
+    fi
+    sleep 1
+    SCAN_RESULTS2=$(run_t "$SCAN_TIMEOUT" iw dev "$IFACE" scan dump 2>/dev/null | awk -v ssid="$SSID" '
         /^BSS /   { bssid=$2; gsub(/\(.*/, "", bssid); freq=""; signal="" }
         /^\tfreq:/   { freq=int($2) }
         /^\tsignal:/ { signal=$2 }
@@ -120,9 +145,14 @@ if [ -z "$BEST_BSSID" ]; then
 fi
 
 # ─── Cambiar a modo IBSS ────────────────────────────────────────────────────
-ip link set "$IFACE" down
-iw dev "$IFACE" set type ibss
-ip link set "$IFACE" up
+run_t "$CMD_TIMEOUT" ip link set "$IFACE" down
+if ! run_t "$CMD_TIMEOUT" iw dev "$IFACE" set type ibss; then
+    echo "[!] La interfaz/driver '$IFACE' no permite modo AD-HOC/IBSS o quedó bloqueada."
+    echo "    Prueba: sudo ADHOC_IFACE=wlanX ./adhoc-on.sh, o usa otra tarjeta Wi-Fi."
+    run_t "$CMD_TIMEOUT" nmcli device set "$IFACE" managed yes 2>/dev/null || true
+    exit 1
+fi
+run_t "$CMD_TIMEOUT" ip link set "$IFACE" up
 
 # ─── IP fija desde la MAC hardware (leída en modo IBSS, sin randomización) ──
 _MAC_LAST=$(ip link show "$IFACE" 2>/dev/null | awk '/ether/{print $2}' | awk -F: '{print $6}' | head -1)
@@ -133,15 +163,27 @@ FIXED_IP="${IP_PREFIX}.${LAST_OCTET}"
 
 if [ -n "$BEST_BSSID" ]; then
     echo "[ON] Uniéndose a red existente: $BEST_BSSID @ ${BEST_FREQ}MHz (${BEST_SIGNAL} dBm)"
-    iw dev "$IFACE" ibss join "$SSID" "$BEST_FREQ" fixed-freq "$BEST_BSSID"
-    echo "$BEST_BSSID" > /tmp/adhoc/cell_id
-    rm -f /tmp/adhoc-master.flag
-else
+    if ! run_t "$JOIN_TIMEOUT" iw dev "$IFACE" ibss join "$SSID" "$BEST_FREQ" fixed-freq "$BEST_BSSID"; then
+        echo "[ON] Falló/timeout al unirse a $BEST_BSSID; crearé una red nueva."
+        BEST_BSSID=""
+    fi
+    if [ -n "$BEST_BSSID" ]; then
+        echo "$BEST_BSSID" > /tmp/adhoc/cell_id
+        rm -f /tmp/adhoc-master.flag
+    fi
+fi
+
+if [ -z "$BEST_BSSID" ]; then
     echo "[ON] Sin redes en rango. Creando nueva red AD-HOC..."
     RAND_MAC=$(printf '02:%02x:%02x:%02x:%02x:%02x' \
         $((RANDOM % 256)) $((RANDOM % 256)) $((RANDOM % 256)) \
         $((RANDOM % 256)) $((RANDOM % 256)))
-    iw dev "$IFACE" ibss join "$SSID" "$FREQ" fixed-freq "$RAND_MAC"
+    if ! run_t "$JOIN_TIMEOUT" iw dev "$IFACE" ibss join "$SSID" "$FREQ" fixed-freq "$RAND_MAC"; then
+        echo "[!] Falló/timeout creando la red AD-HOC. Este adaptador/driver parece incompatible o inestable."
+        run_t "$CMD_TIMEOUT" iw dev "$IFACE" set type managed 2>/dev/null || true
+        run_t "$CMD_TIMEOUT" nmcli device set "$IFACE" managed yes 2>/dev/null || true
+        exit 1
+    fi
     echo "$RAND_MAC" > /tmp/adhoc/cell_id
     touch /tmp/adhoc-master.flag
     echo "[ON] Soy el primero — posible Master."
@@ -151,7 +193,7 @@ fi
 if ip addr show dev "$IFACE" | grep -q "${FIXED_IP}/24"; then
     echo "[ON] IP ${FIXED_IP} ya asignada."
 else
-    ip addr add "${FIXED_IP}/24" dev "$IFACE"
+    run_t "$CMD_TIMEOUT" ip addr add "${FIXED_IP}/24" dev "$IFACE"
 fi
 echo "$FIXED_IP" > /tmp/adhoc/my_ip
 
