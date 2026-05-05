@@ -169,6 +169,7 @@ class AdhocManager:
                             "score": peer_score,
                             "songs": msg.get("songs", []),
                             "is_master": peer_master,
+                            "current_song": msg.get("current_song", "Ninguna"),
                             "last_seen": time.time(),
                         }
                     if is_new:

@@ -106,9 +106,11 @@ class NodeDaemon:
     def _extra_heartbeat(self) -> dict:
         with self.lock:
             master = self.is_master
+            current_song = self.current_song
         return {
             "songs": [s.name for s in self.streamer._songs()],
             "is_master": master,
+            "current_song": current_song,
         }
 
     def _on_song_request(self, song_name: str):
@@ -228,6 +230,15 @@ class NodeDaemon:
             song = self.current_song
             paused = self.paused
         peers = self.net.get_peers_snapshot()
+        # En clientes, mostrar/reproducir en la UI la canción real del master,
+        # no el texto interno del receptor UDP ("Stream UDP broadcast...").
+        if not master:
+            for info in peers.values():
+                if info.get("is_master") and info.get("current_song"):
+                    master_song = info.get("current_song")
+                    if master_song and not str(master_song).startswith("Stream "):
+                        song = master_song
+                    break
         data = build_status(master, song, peers)
         data["paused"] = paused
         data["all_network_songs"] = self._get_all_network_songs()
