@@ -68,6 +68,12 @@ _assign_ip_and_exit() {
     if ! ip addr show dev "$IFACE" | grep -q "${FIXED_IP}/24"; then
         ip addr add "${FIXED_IP}/24" dev "$IFACE"
     fi
+    # Asegurar ruta L2 directa entre nodos. Sin esto Fedora a veces deja la
+    # interfaz en IBSS pero responde "Destination Host Unreachable" al hacer ARP.
+    ip route replace "${IP_PREFIX}.0/24" dev "$IFACE" src "$FIXED_IP" scope link 2>/dev/null || true
+    iw dev "$IFACE" set power_save off 2>/dev/null || true
+    sysctl -w net.ipv4.conf."$IFACE".rp_filter=0 >/dev/null 2>&1 || true
+    sysctl -w net.ipv4.conf.all.rp_filter=0 >/dev/null 2>&1 || true
     echo "$FIXED_IP" > /tmp/adhoc/my_ip
     echo "$cell_id" > /tmp/adhoc/cell_id
     if [ "$is_master" = "1" ]; then
@@ -169,6 +175,10 @@ else
     if ! ip addr show dev "$IFACE" | grep -q "${FIXED_IP}/24"; then
         ip addr add "${FIXED_IP}/24" dev "$IFACE" 2>/dev/null || true
     fi
+    ip route replace "${IP_PREFIX}.0/24" dev "$IFACE" src "$FIXED_IP" scope link 2>/dev/null || true
+    iw dev "$IFACE" set power_save off 2>/dev/null || true
+    sysctl -w net.ipv4.conf."$IFACE".rp_filter=0 >/dev/null 2>&1 || true
+    sysctl -w net.ipv4.conf.all.rp_filter=0 >/dev/null 2>&1 || true
     echo "$FIXED_IP" > /tmp/adhoc/my_ip
     echo "00:00:00:00:00:00" > /tmp/adhoc/cell_id
     touch /tmp/adhoc-master.flag
