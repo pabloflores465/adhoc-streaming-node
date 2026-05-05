@@ -163,18 +163,20 @@ DASHBOARD_HTML = """
     <!-- Inventario -->
     <div class="card">
       <h3>Inventario por nodo</h3>
-      <p><span class="self-node">{{ node_id }}</span> <span style="color:#555">(este nodo):</span></p>
-      <ul style="font-size:.8rem;padding-left:1rem;margin:.3rem 0">
-        {% for s in local_songs %}<li>{{ s }}</li>
-        {% else %}<li class="empty-hint">Sin canciones locales</li>{% endfor %}
-      </ul>
-      {% for nid, info in peers.items() %}
-      <p style="margin-top:.5rem"><span class="peer-node">{{ nid }}</span> <span style="color:#555">({{ info.ip }}):</span></p>
-      <ul style="font-size:.8rem;padding-left:1rem;margin:.3rem 0">
-        {% for s in info.songs %}<li>{{ s }}</li>
-        {% else %}<li class="empty-hint">Sin canciones reportadas</li>{% endfor %}
-      </ul>
-      {% endfor %}
+      <div id="inventory-list">
+        <p><span class="self-node">{{ node_id }}</span> <span style="color:#555">(este nodo):</span></p>
+        <ul style="font-size:.8rem;padding-left:1rem;margin:.3rem 0">
+          {% for s in local_songs %}<li>{{ s }}</li>
+          {% else %}<li class="empty-hint">Sin canciones locales</li>{% endfor %}
+        </ul>
+        {% for nid, info in peers.items() %}
+        <p style="margin-top:.5rem"><span class="peer-node">{{ nid }}</span> <span style="color:#555">({{ info.ip }}):</span></p>
+        <ul style="font-size:.8rem;padding-left:1rem;margin:.3rem 0">
+          {% for s in info.songs %}<li>{{ s }}</li>
+          {% else %}<li class="empty-hint">Sin canciones reportadas</li>{% endfor %}
+        </ul>
+        {% endfor %}
+      </div>
     </div>
 
     <!-- Señal -->
@@ -339,9 +341,32 @@ DASHBOARD_HTML = """
     requestSong(val, true, '');
   });
 
+  function esc(s) {
+    return String(s ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+  }
+
+  function rebuildInventory(data) {
+    const peers = data.peers || {};
+    const localSongs = data.local_songs || [];
+    let html = `<p><span class="self-node">${esc(data.node_id || NODE_ID)}</span> <span style="color:#555">(este nodo):</span></p>`;
+    html += '<ul style="font-size:.8rem;padding-left:1rem;margin:.3rem 0">';
+    if (localSongs.length) localSongs.forEach(s => { html += `<li>${esc(s)}</li>`; });
+    else html += '<li class="empty-hint">Sin canciones locales</li>';
+    html += '</ul>';
+    for (const [nid, info] of Object.entries(peers)) {
+      html += `<p style="margin-top:.5rem"><span class="peer-node">${esc(nid)}</span> <span style="color:#555">(${esc(info.ip || '')}):</span></p>`;
+      html += '<ul style="font-size:.8rem;padding-left:1rem;margin:.3rem 0">';
+      const songs = info.songs || [];
+      if (songs.length) songs.forEach(s => { html += `<li>${esc(s)}</li>`; });
+      else html += '<li class="empty-hint">Sin canciones reportadas</li>';
+      html += '</ul>';
+    }
+    document.getElementById('inventory-list').innerHTML = html;
+  }
+
   async function poll() {
     try {
-      const res  = await fetch('/api/status');
+      const res  = await fetch('/api/status', { cache: 'no-store' });
       const data = await res.json();
       const song  = data.current_song || 'Ninguna';
       const peers = data.peers || {};
@@ -400,6 +425,8 @@ DASHBOARD_HTML = """
         rebuildSongButtons(data.all_network_songs);
       }
 
+      rebuildInventory(data);
+
       // System
       if (data.system) {
         document.getElementById('sys-cpu').textContent  = 'CPU: ' + data.system.cpu_percent + '%';
@@ -414,6 +441,7 @@ DASHBOARD_HTML = """
     setAudioSrcIfChanged(currentSong);
   }
 
+  poll();
   setInterval(poll, 3000);
 </script>
 </body>
@@ -433,7 +461,9 @@ def dashboard():
 @app.route("/api/status")
 def api_status():
     if _daemon_state["status_fn"]:
-        return jsonify(_daemon_state["status_fn"]())
+        resp = jsonify(_daemon_state["status_fn"]())
+        resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        return resp
     return jsonify({"error": "daemon no listo"}), 503
 
 
