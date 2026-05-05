@@ -168,18 +168,19 @@ class NodeDaemon:
         return new_state
 
     def _get_all_network_songs(self) -> list:
-        """Devuelve lista de (song_name, source_node_id, is_local) para toda la red."""
+        """Devuelve lista de dicts {name, node_id, is_local, peer_ip} para toda la red."""
         songs = []
         seen = set()
         for s in self.streamer._songs():
             if s.name not in seen:
-                songs.append((s.name, NODE_ID, True))
+                songs.append({"name": s.name, "node_id": NODE_ID, "is_local": True, "peer_ip": ""})
                 seen.add(s.name)
         peers = self.net.get_peers_snapshot()
         for nid, info in peers.items():
+            peer_ip = info.get("ip", "")
             for song_name in info.get("songs", []):
                 if song_name not in seen:
-                    songs.append((song_name, nid, False))
+                    songs.append({"name": song_name, "node_id": nid, "is_local": False, "peer_ip": peer_ip})
                     seen.add(song_name)
         return songs
 

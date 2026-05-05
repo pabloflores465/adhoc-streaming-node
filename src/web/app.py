@@ -5,7 +5,9 @@ app.py — Panel web y API REST para indicadores y control externo.
 
 import os
 import sys
+import shutil
 import logging
+import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -58,7 +60,6 @@ DASHBOARD_HTML = """
     input[type=text] { padding:.4rem .6rem; width:65%; background:#222; color:#0f0; border:1px solid #444; border-radius:4px; font-size:.85rem; }
     .self-node { color:#0f0; font-weight:bold; }
     .peer-node { color:#0af; font-weight:bold; }
-    /* Player card */
     .player-card { background:#0d1a0d; border:2px solid #0a0; }
     .now-playing { font-size:1.1rem; color:#0f0; margin:.5rem 0; word-break:break-all; }
     .now-playing span { color:#ff0; font-weight:bold; }
@@ -71,8 +72,10 @@ DASHBOARD_HTML = """
     .song-btn:hover { background:#0c0; }
     .song-btn.remote { background:#07f; color:#fff; }
     .song-btn.remote:hover { background:#05c; }
+    .song-btn:disabled { background:#444; color:#888; cursor:wait; }
     .header-row { display:flex; align-items:center; gap:1rem; flex-wrap:wrap; margin-bottom:1rem; }
     .cell-tag { color:#555; font-size:.8rem; }
+    #dl-status { font-size:.8rem; color:#fa0; margin-top:.4rem; min-height:1rem; }
   </style>
 </head>
 <body>
@@ -106,8 +109,10 @@ DASHBOARD_HTML = """
 
       <form id="force-form" style="display:flex;gap:.4rem;margin-top:.5rem;flex-wrap:wrap">
         <input type="text" id="force-input" placeholder="nombre_cancion.mp3">
-        <button type="submit">{% if is_master %}Forzar{% else %}Solicitar{% endif %}</button>
+        <button type="submit" id="force-btn">{% if is_master %}Forzar{% else %}Solicitar{% endif %}</button>
       </form>
+
+      <div id="dl-status"></div>
 
       {% if not is_master %}
       <form action="/api/force-master" method="post" style="margin-top:.5rem">
@@ -121,10 +126,10 @@ DASHBOARD_HTML = """
 
       <p style="margin-top:1rem;font-size:.85rem;color:#0cf"><strong>Canciones en la red:</strong></p>
       <div id="song-buttons" style="display:flex;flex-wrap:wrap;gap:.2rem;margin-top:.3rem">
-        {% for song_name, source, is_local in all_network_songs %}
-        <button class="song-btn {% if not is_local %}remote{% endif %}"
-                onclick="requestSong('{{ song_name }}')">
-          {{ song_name }}{% if not is_local %} [{{ source[:6] }}]{% endif %}
+        {% for song in all_network_songs %}
+        <button class="song-btn {% if not song.is_local %}remote{% endif %}"
+                onclick="requestSong('{{ song.name }}', {{ song.is_local|tojson }}, '{{ song.peer_ip }}')">
+          {{ song.name }}{% if not song.is_local %} [{{ song.node_id[:6] }}]{% endif %}
         </button>
         {% else %}
         <span class="empty-hint">Sin canciones en la red aún.</span>
@@ -202,18 +207,35 @@ DASHBOARD_HTML = """
   const NODE_ID   = "{{ node_id }}";
   let currentSong = "{{ current_song }}";
   let masterIp    = null;
+  let pendingSong  = null;
 
-  const audio    = document.getElementById('player');
+  const audio     = document.getElementById('player');
   const songLabel = document.getElementById('current-song-label');
   const statusDot = document.getElementById('status-dot');
+  const dlStatus  = document.getElementById('dl-status');
 
-  function setAudioSrc(song) {
-    let src = '';
-    if (IS_MASTER) {
-      src = '/stream';
-    } else if (masterIp) {
-      src = 'http://' + masterIp + ':8080/stream';
-    }
+  // Init master IP from server-rendered peers
+  {% for nid, info in peers.items() %}
+    {% if info.is_master %}masterIp = "{{ info.ip }}";{% endif %}
+  {% endfor %}
+
+  function streamUrl() {
+    if (IS_MASTER) return '/stream';
+    if (masterIp)  return 'http://' + masterIp + ':8080/stream';
+    return '';
+  }
+
+  function reloadPlayer(song) {
+    const src = streamUrl();
+    if (!src) return;
+    audio.src = src;
+    audio.setAttribute('data-song', song);
+    audio.load();
+    audio.play().catch(() => {});
+  }
+
+  function setAudioSrcIfChanged(song) {
+    const src = streamUrl();
     if (!src) return;
     if (audio.getAttribute('data-song') !== song) {
       const wasPlaying = !audio.paused;
@@ -223,18 +245,89 @@ DASHBOARD_HTML = """
     }
   }
 
-  function requestSong(name) {
-    const fd = new FormData();
-    fd.append('song', name);
-    fetch('/api/force-song', { method: 'POST', body: fd })
-      .then(r => r.json())
-      .then(d => { if (d.ok) document.getElementById('force-input').value = ''; });
+  // Build a song button element
+  function makeSongBtn(song) {
+    const btn = document.createElement('button');
+    btn.className = 'song-btn' + (song.is_local ? '' : ' remote');
+    btn.textContent = song.name + (song.is_local ? '' : ' [' + song.node_id.slice(0,6) + ']');
+    btn.dataset.song   = song.name;
+    btn.dataset.local  = song.is_local ? '1' : '0';
+    btn.dataset.peerIp = song.peer_ip || '';
+    btn.onclick = () => requestSong(song.name, song.is_local, song.peer_ip || '');
+    return btn;
+  }
+
+  function rebuildSongButtons(songs) {
+    const container = document.getElementById('song-buttons');
+    if (!songs || songs.length === 0) {
+      container.innerHTML = '<span class="empty-hint">Sin canciones en la red aún.</span>';
+      return;
+    }
+    // Preserve buttons that already exist (avoid flicker)
+    const existing = {};
+    container.querySelectorAll('.song-btn').forEach(b => { existing[b.dataset.song] = b; });
+    container.innerHTML = '';
+    songs.forEach(song => {
+      if (existing[song.name]) {
+        container.appendChild(existing[song.name]);
+      } else {
+        container.appendChild(makeSongBtn(song));
+      }
+    });
+  }
+
+  async function requestSong(name, isLocal, peerIp) {
+    pendingSong = name;
+    dlStatus.textContent = '';
+
+    // If remote song, download it first
+    if (!isLocal && peerIp) {
+      dlStatus.textContent = 'Descargando ' + name + ' del peer ' + peerIp + '...';
+      // Disable all buttons while downloading
+      document.querySelectorAll('.song-btn').forEach(b => b.disabled = true);
+      try {
+        const fd = new FormData();
+        fd.append('song', name);
+        fd.append('peer_ip', peerIp);
+        const res  = await fetch('/api/download-song', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!data.ok) {
+          dlStatus.textContent = 'Error al descargar: ' + (data.error || 'desconocido');
+          pendingSong = null;
+          document.querySelectorAll('.song-btn').forEach(b => b.disabled = false);
+          return;
+        }
+        dlStatus.textContent = 'Descargado. Reproduciendo...';
+      } catch(e) {
+        dlStatus.textContent = 'Error de red al descargar.';
+        pendingSong = null;
+        document.querySelectorAll('.song-btn').forEach(b => b.disabled = false);
+        return;
+      }
+      document.querySelectorAll('.song-btn').forEach(b => b.disabled = false);
+    }
+
+    // Force the song on the master
+    const fd2 = new FormData();
+    fd2.append('song', name);
+    await fetch('/api/force-song', { method: 'POST', body: fd2 });
+    document.getElementById('force-input').value = '';
+
+    // Immediately reload player to new stream
+    currentSong = name;
+    songLabel.textContent = name;
+    statusDot.className = 'status-dot dot-playing';
+    reloadPlayer(name);
+
+    setTimeout(() => { dlStatus.textContent = ''; }, 3000);
   }
 
   document.getElementById('force-form').addEventListener('submit', e => {
     e.preventDefault();
     const val = document.getElementById('force-input').value.trim();
-    if (val) requestSong(val);
+    if (!val) return;
+    // Treat typed songs as local (master will resolve via network if not found locally)
+    requestSong(val, true, '');
   });
 
   async function poll() {
@@ -244,7 +337,7 @@ DASHBOARD_HTML = """
       const song  = data.current_song || 'Ninguna';
       const peers = data.peers || {};
 
-      // Find master IP from peers
+      // Find master IP
       for (const [nid, info] of Object.entries(peers)) {
         if (info.is_master) { masterIp = info.ip; break; }
       }
@@ -257,19 +350,23 @@ DASHBOARD_HTML = """
         statusDot.className = 'status-dot dot-idle';
       }
 
-      // Update audio if song changed
-      if (song && song !== 'Ninguna' && song !== currentSong) {
-        currentSong = song;
-        setAudioSrc(song);
-      } else if (song && song !== 'Ninguna' && audio.paused && !audio.getAttribute('data-song')) {
-        setAudioSrc(song);
+      // Update audio when song changes (unless we already triggered it via click)
+      if (song && song !== 'Ninguna') {
+        if (song !== currentSong) {
+          currentSong = song;
+          if (song !== pendingSong) {
+            // Song changed externally (master switched) — reload player
+            reloadPlayer(song);
+          }
+          pendingSong = null;
+        } else if (!audio.getAttribute('data-song')) {
+          setAudioSrcIfChanged(song);
+        }
       }
 
-      // Peer count
+      // Peer count & table
       const peerKeys = Object.keys(peers);
       document.getElementById('peer-count').textContent = peerKeys.length;
-
-      // Peers table
       let html = '';
       if (peerKeys.length) {
         html = '<table><tr><th>Node ID</th><th>IP</th><th>Score</th><th>Rol</th><th>Songs</th></tr>';
@@ -283,21 +380,23 @@ DASHBOARD_HTML = """
       }
       document.getElementById('peers-table').innerHTML = html;
 
+      // Rebuild song buttons from live network data
+      if (data.all_network_songs) {
+        rebuildSongButtons(data.all_network_songs);
+      }
+
       // System
       if (data.system) {
         document.getElementById('sys-cpu').textContent  = 'CPU: ' + data.system.cpu_percent + '%';
         document.getElementById('sys-ram').textContent  = 'RAM libre: ' + data.system.ram_available_mb + ' MB';
         document.getElementById('sys-load').textContent = 'Load avg: ' + data.system.load_avg;
       }
-    } catch(e) { /* red no disponible, intentar de nuevo */ }
+    } catch(e) { /* red no disponible */ }
   }
 
-  // Init: set audio src on load (preload=none so browser won't download until user presses play)
-  {% for nid, info in peers.items() %}
-    {% if info.is_master %}masterIp = "{{ info.ip }}";{% endif %}
-  {% endfor %}
+  // Init player on load
   if (currentSong && currentSong !== 'Ninguna') {
-    setAudioSrc(currentSong);
+    setAudioSrcIfChanged(currentSong);
   }
 
   setInterval(poll, 3000);
@@ -351,6 +450,39 @@ def api_toggle_pause():
     return jsonify({"error": "no disponible"}), 503
 
 
+@app.route("/api/download-song", methods=["POST"])
+def api_download_song():
+    """Descarga una canción de un peer y la guarda en la carpeta local de música."""
+    song    = request.form.get("song", "").strip()
+    peer_ip = request.form.get("peer_ip", "").strip()
+    if not song or not peer_ip:
+        return jsonify({"error": "song y peer_ip requeridos"}), 400
+    if "/" in song or ".." in song:
+        return jsonify({"error": "nombre de canción inválido"}), 400
+
+    music_dir = Path(os.environ.get("ADHOC_MUSIC", "/opt/adhoc-node/music"))
+    dest = music_dir / song
+    if dest.exists():
+        logger.info("Canción ya existe localmente: %s", song)
+        return jsonify({"ok": True, "cached": True})
+
+    url = f"http://{peer_ip}:8080/music/{song}"
+    tmp = dest.with_suffix(".tmp")
+    try:
+        logger.info("Descargando %s desde %s", song, peer_ip)
+        req = urllib.request.Request(url, headers={"User-Agent": "adhoc-node/1.0"})
+        with urllib.request.urlopen(req, timeout=60) as resp, open(tmp, "wb") as f:
+            shutil.copyfileobj(resp, f)
+        tmp.rename(dest)
+        logger.info("Canción descargada exitosamente: %s", song)
+        return jsonify({"ok": True})
+    except Exception as e:
+        if tmp.exists():
+            tmp.unlink()
+        logger.error("Error descargando %s de %s: %s", song, peer_ip, e)
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/stream")
 def stream_audio():
     """Sirve la canción actual como HTTP audio para el player del browser."""
@@ -366,21 +498,23 @@ def stream_audio():
     music_dir = Path(os.environ.get("ADHOC_MUSIC", "/opt/adhoc-node/music"))
     song_path = music_dir / song
     if song_path.exists():
-        return send_file(str(song_path), mimetype="audio/mpeg", conditional=True)
+        mime = "audio/ogg" if song.endswith(".ogg") else "audio/mpeg"
+        return send_file(str(song_path), mimetype=mime, conditional=True)
 
     # Canción remota: redirigir al peer que la tiene
-    peers = status.get("peers", {})
-    for nid, info in peers.items():
-        if song in info.get("songs", []):
-            peer_ip = info.get("ip", "")
-            if peer_ip and peer_ip != "0.0.0.0":
-                return redirect(f"http://{peer_ip}:8080/music/{song}")
+    if _daemon_state["status_fn"]:
+        status_data = _daemon_state["status_fn"]()
+        for nid, info in status_data.get("peers", {}).items():
+            if song in info.get("songs", []):
+                peer_ip = info.get("ip", "")
+                if peer_ip and peer_ip != "0.0.0.0":
+                    return redirect(f"http://{peer_ip}:8080/music/{song}")
     abort(404)
 
 
 @app.route("/music/<path:filename>")
 def serve_music(filename):
-    """Sirve archivos de música para que el Master los descargue/stream."""
+    """Sirve archivos de música locales (para que otros nodos los descarguen)."""
     music_dir = Path(os.environ.get("ADHOC_MUSIC", "/opt/adhoc-node/music"))
     try:
         target = (music_dir / filename).resolve()
