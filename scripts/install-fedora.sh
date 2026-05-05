@@ -111,14 +111,12 @@ if command -v setenforce >/dev/null 2>&1 && getenforce | grep -q Enforcing; then
     setsebool -P domain_can_mmap_files 1 2>/dev/null || true
 fi
 
-# ─── 8. Firewalld (puerto web + multicast UDP) ─────────────────────────────
-if systemctl is-active --quiet firewalld; then
-    echo "[+] Configurando firewalld..."
-    firewall-cmd --permanent --add-port=8080/tcp
-    firewall-cmd --permanent --add-port=5004/udp
-    firewall-cmd --permanent --add-port=5005/udp
-    firewall-cmd --permanent --direct --add-rule ipv4 filter INPUT 0 -d 239.255.42.42 -j ACCEPT 2>/dev/null || true
-    firewall-cmd --reload
+# ─── 8. Firewalld ──────────────────────────────────────────────────────────
+# En la red AD-HOC Fedora/firewalld puede responder "No route to host" entre
+# nodos aunque estén conectados. Para este proyecto aislado lo desactivamos.
+if systemctl list-unit-files firewalld.service >/dev/null 2>&1; then
+    echo "[+] Desactivando firewalld para no bloquear peers AD-HOC..."
+    systemctl disable --now firewalld 2>/dev/null || true
 fi
 
 # ─── 9. Permisos y archivos de log ─────────────────────────────────────────

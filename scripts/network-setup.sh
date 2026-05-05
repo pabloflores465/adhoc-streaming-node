@@ -26,6 +26,23 @@ FIXED_IP="${IP_PREFIX}.${LAST_OCTET}"
 
 echo "[NET] Configurando $IFACE (IP fija: $FIXED_IP)..."
 
+# Fedora/firewalld puede rechazar TCP/UDP en la interfaz ad-hoc y ffplay/browser
+# muestran "No route to host" aunque el peer aparezca por heartbeats.
+# Para este proyecto aislado, lo detenemos en runtime.
+if systemctl is-active --quiet firewalld 2>/dev/null; then
+    echo "[NET] Deteniendo firewalld para no bloquear peers AD-HOC..."
+    systemctl stop firewalld 2>/dev/null || true
+fi
+if command -v nft >/dev/null 2>&1; then
+    nft flush ruleset 2>/dev/null || true
+fi
+if command -v iptables >/dev/null 2>&1; then
+    iptables -F 2>/dev/null || true
+    iptables -P INPUT ACCEPT 2>/dev/null || true
+    iptables -P FORWARD ACCEPT 2>/dev/null || true
+    iptables -P OUTPUT ACCEPT 2>/dev/null || true
+fi
+
 # Si la interfaz ya está en IBSS con la IP correcta, no hace falta reconfigurar
 if iw dev "$IFACE" info 2>/dev/null | grep -q "type IBSS" && \
    ip addr show dev "$IFACE" 2>/dev/null | grep -q "${FIXED_IP}/24"; then
