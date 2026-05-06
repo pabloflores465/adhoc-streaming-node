@@ -33,6 +33,7 @@ import subprocess
 import urllib.request
 import shutil
 import json
+import concurrent.futures
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -47,6 +48,9 @@ NODE_ID = os.environ.get("NODE_ID", "unknown")
 MASTER_PICK_INTERVAL = 0
 REJOIN_INTERVAL = 60
 ISOLATION_NEW_CELL_AFTER = int(os.environ.get("ADHOC_ISOLATION_NEW_CELL_AFTER", "30"))
+ACTIVE_DISCOVERY_INTERVAL = float(os.environ.get("ADHOC_ACTIVE_DISCOVERY_INTERVAL", "5"))
+ACTIVE_DISCOVERY_TIMEOUT = float(os.environ.get("ADHOC_ACTIVE_DISCOVERY_TIMEOUT", "0.6"))
+IP_PREFIX = os.environ.get("ADHOC_NET", "192.168.99")
 REPO_ROOT = "/opt/adhoc-node/repo"
 PEER_CACHE_DIR = Path(os.environ.get("ADHOC_PEER_CACHE", "/opt/adhoc-node/state/peer-cache"))
 
@@ -293,6 +297,7 @@ class NodeDaemon:
                         song = master_song
                     break
         data = build_status(master, song, peers)
+        data["score"] = self.net._my_score()
         data["paused"] = paused
         data["random_mode"] = random_mode
         data["all_network_songs"] = self._get_all_network_songs()
@@ -509,6 +514,43 @@ class NodeDaemon:
             except Exception:
                 self.logger.debug("Error en master_registration_loop", exc_info=True)
 
+    def _probe_peer_http(self, ip: str):
+        """Sondea un posible nodo por HTTP y lo registra si responde."""
+        try:
+            with urllib.request.urlopen(f"http://{ip}:8080/api/status", timeout=ACTIVE_DISCOVERY_TIMEOUT) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            nid = data.get("node_id")
+            if not nid or nid == NODE_ID:
+                return
+            self.net.register_peer({
+                "node_id": nid,
+                "ip": ip,
+                "score": data.get("score", 0),
+                "songs": data.get("local_songs", []),
+                "is_master": data.get("is_master", False),
+                "current_song": data.get("current_song", "Ninguna"),
+            }, addr_ip=ip)
+            self.logger.debug("Active discovery detectó peer %s en %s", nid, ip)
+        except Exception:
+            pass
+
+    def _active_discovery_loop(self):
+        """Busca peers activos constantemente aunque UDP/handshake falle.
+
+        Esto permite encender/apagar nodos en cualquier momento: el master no
+        depende solo de heartbeats entrantes, también barre la subred ad-hoc y
+        registra cualquier /api/status que responda.
+        """
+        while True:
+            time.sleep(ACTIVE_DISCOVERY_INTERVAL)
+            try:
+                my_ip = self.net._get_my_ip()
+                candidates = [f"{IP_PREFIX}.{i}" for i in range(10, 251) if f"{IP_PREFIX}.{i}" != my_ip]
+                with concurrent.futures.ThreadPoolExecutor(max_workers=48) as executor:
+                    list(executor.map(self._probe_peer_http, candidates))
+            except Exception:
+                self.logger.debug("Error en active discovery", exc_info=True)
+
     def _isolation_loop(self):
         """Si queda aislado >30s, crea celda IBSS propia y se vuelve master."""
         script = f"{REPO_ROOT}/scripts/network-setup.sh"
@@ -668,6 +710,7 @@ class NodeDaemon:
             threading.Thread(target=self._state_persist_loop,daemon=True, name="state-persist"),
             threading.Thread(target=self._connectivity_keepalive_loop, daemon=True, name="connectivity-keepalive"),
             threading.Thread(target=self._master_registration_loop, daemon=True, name="master-registration"),
+            threading.Thread(target=self._active_discovery_loop, daemon=True, name="active-discovery"),
             threading.Thread(target=self._isolation_loop,    daemon=True, name="isolation"),
             threading.Thread(target=self._rejoin_loop,       daemon=True, name="rejoin"),
             threading.Thread(target=self._master_logic,      daemon=True, name="master-logic"),
