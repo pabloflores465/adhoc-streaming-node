@@ -24,6 +24,7 @@ _daemon_state = {
     "current_song": "Ninguna",
     "peers": {},
     "status_fn": None,
+    "hello_fn": None,
     "current_song_fn": None,
     "force_song_fn": None,
     "force_master_fn": None,
@@ -556,6 +557,16 @@ def dashboard():
 def api_status():
     if _daemon_state["status_fn"]:
         resp = jsonify(_daemon_state["status_fn"]())
+        resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        return resp
+    return jsonify({"error": "daemon no listo"}), 503
+
+
+@app.route("/api/hello")
+def api_hello():
+    """Endpoint liviano para descubrimiento; no llama iw ni métricas pesadas."""
+    if _daemon_state["hello_fn"]:
+        resp = jsonify(_daemon_state["hello_fn"]())
         resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         return resp
     return jsonify({"error": "daemon no listo"}), 503

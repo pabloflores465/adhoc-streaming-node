@@ -48,8 +48,9 @@ NODE_ID = os.environ.get("NODE_ID", "unknown")
 MASTER_PICK_INTERVAL = 0
 REJOIN_INTERVAL = 60
 ISOLATION_NEW_CELL_AFTER = int(os.environ.get("ADHOC_ISOLATION_NEW_CELL_AFTER", "30"))
-ACTIVE_DISCOVERY_INTERVAL = float(os.environ.get("ADHOC_ACTIVE_DISCOVERY_INTERVAL", "5"))
-ACTIVE_DISCOVERY_TIMEOUT = float(os.environ.get("ADHOC_ACTIVE_DISCOVERY_TIMEOUT", "0.6"))
+ACTIVE_DISCOVERY_INTERVAL = float(os.environ.get("ADHOC_ACTIVE_DISCOVERY_INTERVAL", "12"))
+ACTIVE_DISCOVERY_FULL_SCAN_INTERVAL = float(os.environ.get("ADHOC_ACTIVE_DISCOVERY_FULL_SCAN_INTERVAL", "45"))
+ACTIVE_DISCOVERY_TIMEOUT = float(os.environ.get("ADHOC_ACTIVE_DISCOVERY_TIMEOUT", "0.35"))
 IP_PREFIX = os.environ.get("ADHOC_NET", "192.168.99")
 REPO_ROOT = "/opt/adhoc-node/repo"
 PEER_CACHE_DIR = Path(os.environ.get("ADHOC_PEER_CACHE", "/opt/adhoc-node/state/peer-cache"))
@@ -104,6 +105,7 @@ class NodeDaemon:
         self.peer_song_cache: dict[tuple[str, str], Path] = {}
 
         webapp._daemon_state["status_fn"] = self.get_status
+        webapp._daemon_state["hello_fn"] = self.get_hello
         webapp._daemon_state["current_song_fn"] = self._get_current_song
         webapp._daemon_state["force_song_fn"] = self.force_song
         webapp._daemon_state["force_master_fn"] = self.force_master
@@ -279,6 +281,21 @@ class NodeDaemon:
                     songs.append({"name": song_name, "node_id": nid, "is_local": False, "peer_ip": peer_ip})
                     seen.add(song_name)
         return songs
+
+    def get_hello(self):
+        """Estado liviano para descubrimiento entre nodos; evita iw/psutil."""
+        with self.lock:
+            master = self.is_master
+            song = self.current_song
+        return {
+            "node_id": NODE_ID,
+            "ip": self.net._get_my_ip(),
+            "score": self.net._my_score(),
+            "is_master": master,
+            "songs": [s.name for s in self.streamer._songs()],
+            "local_songs": [s.name for s in self.streamer._songs()],
+            "current_song": song,
+        }
 
     def get_status(self):
         with self.lock:
@@ -517,7 +534,7 @@ class NodeDaemon:
     def _probe_peer_http(self, ip: str):
         """Sondea un posible nodo por HTTP y lo registra si responde."""
         try:
-            with urllib.request.urlopen(f"http://{ip}:8080/api/status", timeout=ACTIVE_DISCOVERY_TIMEOUT) as resp:
+            with urllib.request.urlopen(f"http://{ip}:8080/api/hello", timeout=ACTIVE_DISCOVERY_TIMEOUT) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
             nid = data.get("node_id")
             if not nid or nid == NODE_ID:
@@ -535,19 +552,44 @@ class NodeDaemon:
             pass
 
     def _active_discovery_loop(self):
-        """Busca peers activos constantemente aunque UDP/handshake falle.
+        """Busca peers sin tumbar el stream.
 
-        Esto permite encender/apagar nodos en cualquier momento: el master no
-        depende solo de heartbeats entrantes, también barre la subred ad-hoc y
-        registra cualquier /api/status que responda.
+        No hacemos barridos agresivos cada pocos segundos porque saturan IBSS y
+        cortan audio/HTTP. Frecuente: solo peers conocidos/vecinos ARP. Barrido
+        completo: cada 45s como respaldo para nodos nuevos.
         """
+        last_full_scan = 0.0
         while True:
             time.sleep(ACTIVE_DISCOVERY_INTERVAL)
             try:
                 my_ip = self.net._get_my_ip()
-                candidates = [f"{IP_PREFIX}.{i}" for i in range(10, 251) if f"{IP_PREFIX}.{i}" != my_ip]
-                with concurrent.futures.ThreadPoolExecutor(max_workers=48) as executor:
-                    list(executor.map(self._probe_peer_http, candidates))
+                now = time.time()
+                candidates = set()
+
+                # Primero mantener/validar peers ya conocidos.
+                for info in self.net.get_peers_snapshot().values():
+                    ip = info.get("ip")
+                    if ip and ip != "0.0.0.0" and ip != my_ip:
+                        candidates.add(ip)
+
+                # También probar vecinos ARP que el kernel ya vio.
+                try:
+                    neigh = subprocess.run(["ip", "neigh"], capture_output=True, text=True, timeout=1)
+                    for line in neigh.stdout.splitlines():
+                        ip = line.split()[0]
+                        if ip.startswith(f"{IP_PREFIX}.") and ip != my_ip:
+                            candidates.add(ip)
+                except Exception:
+                    pass
+
+                # Barrido completo poco frecuente para detectar nodos que encienden tarde.
+                if now - last_full_scan >= ACTIVE_DISCOVERY_FULL_SCAN_INTERVAL:
+                    candidates.update(f"{IP_PREFIX}.{i}" for i in range(10, 251) if f"{IP_PREFIX}.{i}" != my_ip)
+                    last_full_scan = now
+
+                if candidates:
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=12) as executor:
+                        list(executor.map(self._probe_peer_http, sorted(candidates)))
             except Exception:
                 self.logger.debug("Error en active discovery", exc_info=True)
 
