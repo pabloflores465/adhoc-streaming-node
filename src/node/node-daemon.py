@@ -87,6 +87,7 @@ class NodeDaemon:
         self.current_song = "Ninguna"
         self.previous_song = "Ninguna"
         self.paused = False
+        self.random_mode = os.environ.get("ADHOC_RANDOM_MODE", "1") != "0"
         self.lock = threading.Lock()
         self.client_restart_pending = False
         # Cache privado del master: (node_id, song) -> path descargado.
@@ -98,6 +99,7 @@ class NodeDaemon:
         webapp._daemon_state["force_song_fn"] = self.force_song
         webapp._daemon_state["force_master_fn"] = self.force_master
         webapp._daemon_state["toggle_pause_fn"] = self.toggle_pause
+        webapp._daemon_state["toggle_random_fn"] = self.toggle_random
 
     def _get_current_song(self) -> str:
         with self.lock:
@@ -127,8 +129,12 @@ class NodeDaemon:
     def _on_stream_eof(self):
         with self.lock:
             if self.is_master:
-                self.logger.info("Stream master terminó, eligiendo siguiente...")
-                self._pick_and_stream()
+                if self.random_mode:
+                    self.logger.info("Stream master terminó, eligiendo siguiente (random ON)...")
+                    self._pick_and_stream()
+                else:
+                    self.logger.info("Stream master terminó; random OFF, esperando selección manual.")
+                    self.current_song = "Ninguna"
             else:
                 self.logger.info("Cliente stream terminó, marcando reinicio...")
                 self.client_restart_pending = True
@@ -207,6 +213,15 @@ class NodeDaemon:
         self.logger.info("Pausa toggled: %s", new_state)
         return new_state
 
+    def toggle_random(self) -> bool:
+        with self.lock:
+            self.random_mode = not self.random_mode
+            new_state = self.random_mode
+        self.logger.info("Random mode toggled: %s", new_state)
+        if new_state and self.is_master and not self.streamer.is_running():
+            self._pick_and_stream()
+        return new_state
+
     def _get_all_network_songs(self) -> list:
         """Devuelve lista de dicts {name, node_id, is_local, peer_ip} para toda la red."""
         songs = []
@@ -229,6 +244,7 @@ class NodeDaemon:
             master = self.is_master
             song = self.current_song
             paused = self.paused
+            random_mode = self.random_mode
         peers = self.net.get_peers_snapshot()
         # En clientes, mostrar/reproducir en la UI la canción real del master,
         # no el texto interno del receptor UDP ("Stream UDP broadcast...").
@@ -241,6 +257,7 @@ class NodeDaemon:
                     break
         data = build_status(master, song, peers)
         data["paused"] = paused
+        data["random_mode"] = random_mode
         data["all_network_songs"] = self._get_all_network_songs()
         return data
 
@@ -393,14 +410,19 @@ class NodeDaemon:
                 self.logger.exception("Error persistiendo estado")
 
     def _connectivity_keepalive_loop(self):
-        """Mantiene ARP/rutas vivas entre peers.
+        """Busca/actualiza peers constantemente y mantiene ARP/rutas vivas.
 
-        En IBSS/Fedora hemos visto conectividad asimétrica: los heartbeats llegan,
-        pero TCP/HTTP falla hasta que un lado hace ping. Este loop fuerza tráfico
-        unicast ligero hacia cada peer para poblar la tabla ARP en ambos lados.
+        No aumenta el timeout: fuerza tráfico frecuente para descubrir rápido,
+        actualizar estado en la UI y evitar tener que hacer ping manual.
         """
         while True:
-            time.sleep(5)
+            time.sleep(2)
+            try:
+                with self.lock:
+                    master = self.is_master
+                self.net.send_heartbeat(is_master=master)
+            except Exception:
+                pass
             try:
                 peers = self.net.get_peers_snapshot()
                 for info in peers.values():
@@ -485,7 +507,10 @@ class NodeDaemon:
                         else:
                             self.logger.info("No hay Master con mejor score confirmado. Tomando control.")
                     self.streamer.stop()
-                    self._pick_and_stream()
+                    if self.random_mode:
+                        self._pick_and_stream()
+                    else:
+                        self.logger.info("Master activo con random OFF; esperando selección manual.")
                     continue
 
                 if lost_master:
@@ -499,7 +524,8 @@ class NodeDaemon:
                 if self.is_master:
                     with self.lock:
                         has_forced = self.forced_song is not None
-                    if not self.streamer.is_running() or has_forced:
+                        random_mode = self.random_mode
+                    if has_forced or (random_mode and not self.streamer.is_running()):
                         self._pick_and_stream()
                 else:
                     # Cliente: si hay pending y NO estamos pausados, reiniciar

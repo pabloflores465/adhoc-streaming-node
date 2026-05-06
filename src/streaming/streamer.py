@@ -56,16 +56,21 @@ class Streamer:
         if proc:
             _, stderr_data = proc.communicate()
             elapsed = time.time() - start
+            ended_current = False
             with self.lock:
                 if self.proc is proc:
                     self.proc = None
+                    ended_current = True
             if stderr_data:
                 tail = stderr_data.decode("utf-8", errors="replace").strip()[-600:]
                 if elapsed < 5:
                     logger.error("ffmpeg terminó rápido (%.1fs). Stderr: %s", elapsed, tail)
                 else:
                     logger.debug("ffmpeg stderr (últimas líneas): %s", tail)
-            if self.on_eof:
+            # Solo notificar EOF si este proceso seguía siendo el activo.
+            # Si terminó porque stop() lo reemplazó, no debemos disparar otra
+            # selección/reinicio fantasma.
+            if ended_current and self.on_eof:
                 self.on_eof()
 
     def _start_server_common(self, source: str, song_name: str):

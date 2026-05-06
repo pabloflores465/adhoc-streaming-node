@@ -28,6 +28,7 @@ _daemon_state = {
     "force_song_fn": None,
     "force_master_fn": None,
     "toggle_pause_fn": None,
+    "toggle_random_fn": None,
 }
 
 DASHBOARD_HTML = """
@@ -124,9 +125,15 @@ DASHBOARD_HTML = """
       </form>
       {% endif %}
 
-      <form action="/api/toggle-pause" method="post" style="margin-top:.5rem">
-        <button type="submit" class="btn-pause">{% if paused %}▶ Reanudar{% else %}⏸ Pausar{% endif %}</button>
+      <form id="pause-form" action="/api/toggle-pause" method="post" style="margin-top:.5rem">
+        <button id="pause-btn" type="submit" class="btn-pause">{% if paused %}▶ Reanudar{% else %}⏸ Pausar{% endif %}</button>
       </form>
+
+      {% if is_master %}
+      <form id="random-form" action="/api/toggle-random" method="post" style="margin-top:.5rem">
+        <button id="random-btn" type="submit" class="btn-master">Random: {% if random_mode %}ON{% else %}OFF{% endif %}</button>
+      </form>
+      {% endif %}
 
       <p style="margin-top:1rem;font-size:.85rem;color:#0cf"><strong>Canciones en la red:</strong></p>
       <div id="song-buttons" style="display:flex;flex-wrap:wrap;gap:.2rem;margin-top:.3rem">
@@ -383,6 +390,22 @@ DASHBOARD_HTML = """
     requestSong(val, true, '');
   });
 
+  document.getElementById('pause-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const res = await fetch('/api/toggle-pause', { method: 'POST' });
+    const data = await res.json();
+    document.getElementById('pause-btn').textContent = data.paused ? '▶ Reanudar' : '⏸ Pausar';
+  });
+
+  const randomForm = document.getElementById('random-form');
+  if (randomForm) randomForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    const res = await fetch('/api/toggle-random', { method: 'POST' });
+    const data = await res.json();
+    const btn = document.getElementById('random-btn');
+    if (btn) btn.textContent = 'Random: ' + (data.random_mode ? 'ON' : 'OFF');
+  });
+
   function esc(s) {
     return String(s ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
   }
@@ -534,6 +557,15 @@ def api_toggle_pause():
     if _daemon_state["toggle_pause_fn"]:
         paused = _daemon_state["toggle_pause_fn"]()
         return jsonify({"ok": True, "paused": paused})
+    return jsonify({"error": "no disponible"}), 503
+
+
+@app.route("/api/toggle-random", methods=["POST"])
+def api_toggle_random():
+    logger.info("API: toggle-random solicitado")
+    if _daemon_state["toggle_random_fn"]:
+        random_mode = _daemon_state["toggle_random_fn"]()
+        return jsonify({"ok": True, "random_mode": random_mode})
     return jsonify({"error": "no disponible"}), 503
 
 

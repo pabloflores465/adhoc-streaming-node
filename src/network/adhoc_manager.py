@@ -35,7 +35,7 @@ MULTI_ADDR = os.environ.get("ADHOC_MULTI", "239.255.42.42")
 PORT = int(os.environ.get("ADHOC_PORT", "5004"))
 HEARTBEAT_PORT = PORT + 1
 # Un peer se considera desconectado si no manda heartbeats en este tiempo.
-# Los heartbeats salen cada 3s; 9s permite perder 2 paquetes sin dejar nodos fantasma.
+# Los heartbeats salen cada 3s; 9s mantiene la UI fresca sin nodos fantasma.
 PEER_TIMEOUT = float(os.environ.get("ADHOC_PEER_TIMEOUT", "9"))
 IP_PREFIX = os.environ.get("ADHOC_NET", "192.168.99")
 BROADCAST_ADDR = f"{IP_PREFIX}.255"
@@ -110,9 +110,7 @@ class AdhocManager:
             pass
         return "0.0.0.0"
 
-    def send_heartbeat(self, is_master: bool = False):
-        if self.sock is None:
-            return
+    def _heartbeat_payload(self, is_master: bool = False, reply: bool = False) -> bytes:
         msg = {
             "type": "heartbeat",
             "node_id": NODE_ID,
@@ -121,9 +119,24 @@ class AdhocManager:
             "ip": self._get_my_ip(),
             "is_master": is_master,
         }
+        if reply:
+            msg["reply"] = True
         if self.extra_heartbeat_fn:
             msg.update(self.extra_heartbeat_fn())
-        payload = json.dumps(msg).encode("utf-8")
+        return json.dumps(msg).encode("utf-8")
+
+    def _send_unicast_heartbeat(self, peer_ip: str, is_master: bool = False, reply: bool = False):
+        if self.sock is None or not peer_ip or peer_ip == "0.0.0.0":
+            return
+        try:
+            self.sock.sendto(self._heartbeat_payload(is_master=is_master, reply=reply), (peer_ip, self.port))
+        except OSError as e:
+            logger.debug("Error enviando heartbeat unicast a %s: %s", peer_ip, e)
+
+    def send_heartbeat(self, is_master: bool = False):
+        if self.sock is None:
+            return
+        payload = self._heartbeat_payload(is_master=is_master)
         targets = [(BROADCAST_ADDR, self.port), (MULTI_ADDR, self.port)]
         # En IBSS algunos drivers/Fedora entregan broadcast de forma asimétrica.
         # Si ya conocemos algún peer, también mandamos heartbeat unicast para que
@@ -174,24 +187,10 @@ class AdhocManager:
                     peer_ip = msg.get("ip", addr[0])
                     peer_master = msg.get("is_master", False)
                     peer_score = msg.get("score", 0)
-                    # Respuesta unicast inmediata: ayuda a que el emisor nos
-                    # descubra aunque los broadcasts sean asimétricos en IBSS.
+                    # Respuesta unicast inmediata y repetida: ayuda a que el emisor
+                    # nos descubra aunque los broadcasts sean asimétricos en IBSS.
                     if not msg.get("reply"):
-                        try:
-                            reply = {
-                                "type": "heartbeat",
-                                "node_id": NODE_ID,
-                                "timestamp": time.time(),
-                                "score": self._my_score(),
-                                "ip": self._get_my_ip(),
-                                "is_master": False,
-                                "reply": True,
-                            }
-                            if self.extra_heartbeat_fn:
-                                reply.update(self.extra_heartbeat_fn())
-                            self.sock.sendto(json.dumps(reply).encode("utf-8"), (peer_ip, self.port))
-                        except Exception:
-                            logger.debug("No se pudo responder heartbeat unicast a %s", peer_ip, exc_info=True)
+                        self._send_unicast_heartbeat(peer_ip, reply=True)
                     with self.lock:
                         is_new = nid not in self.peers
                         prev_master = self.peers.get(nid, {}).get("is_master")

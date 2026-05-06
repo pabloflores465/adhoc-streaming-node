@@ -17,6 +17,8 @@ Environment="ADHOC_NET=192.168.99"
 Environment="ADHOC_MULTI=239.255.42.42"
 Environment="ADHOC_PORT=5004"
 Environment="ADHOC_PLAYER=mpv"
+# Master arranca reproduciendo automáticamente por defecto.
+Environment="ADHOC_RANDOM_MODE=1"
 Environment="PYTHONUNBUFFERED=1"
 
 [Install]
