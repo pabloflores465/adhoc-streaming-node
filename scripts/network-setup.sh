@@ -14,6 +14,7 @@ SSID="${ADHOC_SSID:-ADHOC-STREAM}"
 FREQ="${ADHOC_FREQ:-2412}"
 IP_PREFIX="${ADHOC_NET:-192.168.99}"
 PREFERRED_CELL="${PREFERRED_CELL:-}"
+FORCE_NEW_CELL="${FORCE_NEW_CELL:-0}"
 
 mkdir -p /tmp/adhoc
 
@@ -103,6 +104,22 @@ _join_ibss() {
         return 1
     fi
 }
+
+# Si el daemon detecta aislamiento prolongado, fuerza una celda nueva.
+# Esto cumple: si un nodo queda fuera de cobertura, crea red independiente
+# y queda listo para aceptar nodos que sí estén en su rango.
+if [ "$FORCE_NEW_CELL" = "1" ]; then
+    echo "[NET] FORCE_NEW_CELL=1: creando IBSS nueva sin unirse a redes existentes..."
+    RAND_MAC=$(printf '02:%02x:%02x:%02x:%02x:%02x' \
+        $((RANDOM % 256)) $((RANDOM % 256)) $((RANDOM % 256)) \
+        $((RANDOM % 256)) $((RANDOM % 256)))
+    if _join_ibss "$RAND_MAC" "$FREQ"; then
+        _assign_ip_and_exit "$RAND_MAC" "1"
+    else
+        echo "[NET] ERROR: No se pudo crear IBSS forzada."
+        exit 1
+    fi
+fi
 
 # === Reintento a celda preferida ===
 if [ -n "$PREFERRED_CELL" ]; then

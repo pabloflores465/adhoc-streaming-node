@@ -46,6 +46,7 @@ from node import state as node_state
 NODE_ID = os.environ.get("NODE_ID", "unknown")
 MASTER_PICK_INTERVAL = 0
 REJOIN_INTERVAL = 60
+ISOLATION_NEW_CELL_AFTER = int(os.environ.get("ADHOC_ISOLATION_NEW_CELL_AFTER", "30"))
 REPO_ROOT = "/opt/adhoc-node/repo"
 PEER_CACHE_DIR = Path(os.environ.get("ADHOC_PEER_CACHE", "/opt/adhoc-node/state/peer-cache"))
 
@@ -91,6 +92,8 @@ class NodeDaemon:
         self.random_mode = os.environ.get("ADHOC_RANDOM_MODE", "1") != "0"
         self.lock = threading.Lock()
         self.client_restart_pending = False
+        self.last_peer_seen_time = time.time()
+        self.last_forced_new_cell_time = 0.0
         # Cache privado del master: (node_id, song) -> path descargado.
         # Solo se usa mientras ese peer siga conectado.
         self.peer_song_cache: dict[tuple[str, str], Path] = {}
@@ -264,6 +267,7 @@ class NodeDaemon:
         data["paused"] = paused
         data["random_mode"] = random_mode
         data["all_network_songs"] = self._get_all_network_songs()
+        data["isolation_new_cell_after"] = ISOLATION_NEW_CELL_AFTER
         return data
 
     def _pick_and_stream(self):
@@ -467,6 +471,45 @@ class NodeDaemon:
             except Exception:
                 self.logger.debug("Keepalive de conectividad falló", exc_info=True)
 
+    def _isolation_loop(self):
+        """Si queda aislado >30s, crea celda IBSS propia y se vuelve master."""
+        script = f"{REPO_ROOT}/scripts/network-setup.sh"
+        while True:
+            time.sleep(5)
+            try:
+                peers = self.net.get_peers_snapshot()
+                now = time.time()
+                if peers:
+                    self.last_peer_seen_time = now
+                    continue
+                if now - self.last_peer_seen_time < ISOLATION_NEW_CELL_AFTER:
+                    continue
+                # Evitar recrear la celda una y otra vez; una vez aislado, será master.
+                if now - self.last_forced_new_cell_time < 120:
+                    with self.lock:
+                        self.is_master = True
+                        self.forced_master = True
+                    continue
+                self.logger.warning(
+                    "Nodo aislado por >%ss. Creando red IBSS nueva y tomando rol MASTER...",
+                    ISOLATION_NEW_CELL_AFTER,
+                )
+                self.streamer.stop()
+                env = os.environ.copy()
+                env["FORCE_NEW_CELL"] = "1"
+                result = subprocess.run(["bash", script], env=env, capture_output=True, text=True, timeout=45)
+                if result.returncode == 0:
+                    with self.lock:
+                        self.is_master = True
+                        self.forced_master = True
+                        self.client_restart_pending = False
+                    self.last_forced_new_cell_time = now
+                    self.logger.info("Nueva celda IBSS creada por aislamiento")
+                else:
+                    self.logger.warning("No se pudo crear nueva celda: %s", result.stderr.strip())
+            except Exception:
+                self.logger.exception("Error en isolation loop")
+
     def _rejoin_loop(self):
         script = f"{REPO_ROOT}/scripts/network-rejoin.sh"
         while True:
@@ -586,6 +629,7 @@ class NodeDaemon:
             threading.Thread(target=self._ip_conflict_loop,  daemon=True, name="ip-conflict"),
             threading.Thread(target=self._state_persist_loop,daemon=True, name="state-persist"),
             threading.Thread(target=self._connectivity_keepalive_loop, daemon=True, name="connectivity-keepalive"),
+            threading.Thread(target=self._isolation_loop,    daemon=True, name="isolation"),
             threading.Thread(target=self._rejoin_loop,       daemon=True, name="rejoin"),
             threading.Thread(target=self._master_logic,      daemon=True, name="master-logic"),
             threading.Thread(target=self._web_loop,          daemon=True, name="web"),

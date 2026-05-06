@@ -207,6 +207,21 @@ DASHBOARD_HTML = """
       {% endif %}
     </div>
 
+    <!-- Indicadores requeridos -->
+    <div class="card">
+      <h3>Indicadores del nodo</h3>
+      <p style="font-size:.85rem"><strong>Tasa TX activa:</strong> <span id="ind-tx-rate">{{ tx_rate }}</span></p>
+      <p style="font-size:.85rem"><strong>Nodos activos vistos:</strong> <span id="ind-active-peers">{{ active_peers|join(', ') if active_peers else 'Ninguno' }}</span></p>
+      <p style="font-size:.85rem"><strong>Modulación:</strong> <span id="ind-modulation">{{ modulation }}</span></p>
+      <p style="font-size:.85rem"><strong>Canciones locales:</strong> <span id="ind-local-count">{{ local_songs|length }}</span></p>
+      <p style="font-size:.85rem"><strong>Canción en streaming:</strong> <span id="ind-stream-song">{{ current_streaming_song }}</span></p>
+      <p style="font-size:.85rem"><strong>Señal hacia nodos:</strong></p>
+      <ul id="ind-signal-list" style="font-size:.8rem;padding-left:1rem;margin:.3rem 0">
+        {% for mac, sig in signal_levels.items() %}<li>{{ mac }}: {{ sig }}</li>
+        {% else %}<li class="empty-hint">Sin señal reportada</li>{% endfor %}
+      </ul>
+    </div>
+
     <!-- Sistema -->
     <div class="card">
       <h3>Sistema</h3>
@@ -492,6 +507,19 @@ DASHBOARD_HTML = """
       }
 
       rebuildInventory(data);
+
+      // Required indicators
+      document.getElementById('ind-tx-rate').textContent = data.tx_rate || 'N/A';
+      document.getElementById('ind-active-peers').textContent = (data.active_peers && data.active_peers.length) ? data.active_peers.join(', ') : 'Ninguno';
+      document.getElementById('ind-modulation').textContent = data.modulation || 'N/A';
+      document.getElementById('ind-local-count').textContent = (data.local_songs || []).length;
+      document.getElementById('ind-stream-song').textContent = data.current_streaming_song || data.current_song || 'Ninguna';
+      const sigList = document.getElementById('ind-signal-list');
+      const sigs = data.signal_levels || {};
+      const sigKeys = Object.keys(sigs);
+      sigList.innerHTML = sigKeys.length
+        ? sigKeys.map(mac => `<li>${esc(mac)}: ${esc(sigs[mac])}</li>`).join('')
+        : '<li class="empty-hint">Sin señal reportada</li>';
 
       // System
       if (data.system) {
