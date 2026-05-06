@@ -235,6 +235,17 @@ DASHBOARD_HTML = """
     return '';
   }
 
+  function mediaUrl(song) {
+    // Firefox reproduce más confiable archivos MP3 directos que el endpoint
+    // /stream entre nodos. Si sabemos la canción, usamos /music/<archivo>.
+    if (song && song !== 'Ninguna' && !song.startsWith('Stream ') && !song.includes('/') && !song.includes('..')) {
+      const file = encodeURIComponent(song);
+      if (IS_MASTER) return '/music/' + file;
+      if (masterIp) return 'http://' + masterIp + ':8080/music/' + file;
+    }
+    return streamUrl();
+  }
+
   async function tryPlay() {
     if (!audio.src) return;
     try {
@@ -246,7 +257,7 @@ DASHBOARD_HTML = """
   }
 
   function reloadPlayer(song) {
-    const src = streamUrl();
+    const src = mediaUrl(song);
     if (!src) return;
     // Cache-bust so the browser always makes a new request even if base URL is identical
     audio.src = src + '?t=' + Date.now();
@@ -257,7 +268,7 @@ DASHBOARD_HTML = """
   }
 
   function setAudioSrcIfChanged(song) {
-    const src = streamUrl();
+    const src = mediaUrl(song);
     if (!src) return;
     const key = song + '|' + src;
     if (audio.getAttribute('data-song') !== key) {
