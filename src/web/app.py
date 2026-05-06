@@ -29,6 +29,7 @@ _daemon_state = {
     "force_master_fn": None,
     "toggle_pause_fn": None,
     "toggle_random_fn": None,
+    "register_peer_fn": None,
 }
 
 DASHBOARD_HTML = """
@@ -567,6 +568,16 @@ def api_toggle_random():
         random_mode = _daemon_state["toggle_random_fn"]()
         return jsonify({"ok": True, "random_mode": random_mode})
     return jsonify({"error": "no disponible"}), 503
+
+
+@app.route("/api/register-peer", methods=["POST"])
+def api_register_peer():
+    """Fallback HTTP para registrar peers cuando UDP IBSS es asimétrico."""
+    if not _daemon_state.get("register_peer_fn"):
+        return jsonify({"error": "no disponible"}), 503
+    data = request.get_json(silent=True) or {}
+    _daemon_state["register_peer_fn"](data, request.remote_addr or "")
+    return jsonify({"ok": True})
 
 
 @app.route("/api/download-song", methods=["POST"])

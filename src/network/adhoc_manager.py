@@ -263,6 +263,35 @@ class AdhocManager:
                     return False
             return True
 
+    def register_peer(self, info: Dict[str, Any], addr_ip: str = ""):
+        """Registra/actualiza un peer anunciado por HTTP.
+
+        Fallback para IBSS cuando UDP broadcast/unicast es asimétrico: si el
+        cliente sí ve al master, le hace POST /api/register-peer y el master lo
+        inserta aquí para que la UI/stream lo reconozcan inmediatamente.
+        """
+        nid = info.get("node_id")
+        if not nid or nid == NODE_ID:
+            return
+        peer_ip = info.get("ip") or addr_ip
+        with self.lock:
+            is_new = nid not in self.peers
+            self.peers[nid] = {
+                "ip": peer_ip,
+                "score": info.get("score", 0),
+                "songs": info.get("songs", []),
+                "is_master": info.get("is_master", False),
+                "current_song": info.get("current_song", "Ninguna"),
+                "last_seen": time.time(),
+            }
+        if is_new:
+            logger.info("Peer registrado vía HTTP: %s ip=%s", nid, peer_ip)
+
+    def local_announcement(self, is_master: bool = False) -> Dict[str, Any]:
+        payload = json.loads(self._heartbeat_payload(is_master=is_master).decode("utf-8"))
+        payload["type"] = "peer_announce"
+        return payload
+
     def detect_ip_conflicts(self) -> list:
         conflicts = []
         with self.lock:

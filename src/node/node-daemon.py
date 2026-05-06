@@ -32,6 +32,7 @@ import logging.handlers
 import subprocess
 import urllib.request
 import shutil
+import json
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -100,6 +101,7 @@ class NodeDaemon:
         webapp._daemon_state["force_master_fn"] = self.force_master
         webapp._daemon_state["toggle_pause_fn"] = self.toggle_pause
         webapp._daemon_state["toggle_random_fn"] = self.toggle_random
+        webapp._daemon_state["register_peer_fn"] = self._register_peer_http
 
     def _get_current_song(self) -> str:
         with self.lock:
@@ -191,6 +193,9 @@ class NodeDaemon:
             if info.get("is_master") and info.get("score", 0) > my_score:
                 return True
         return False
+
+    def _register_peer_http(self, data: dict, addr_ip: str = ""):
+        self.net.register_peer(data, addr_ip=addr_ip)
 
     def force_song(self, song_name: str) -> bool:
         self.logger.info("Solicitando canción vía broadcast: %s", song_name)
@@ -440,6 +445,23 @@ class NodeDaemon:
                     try:
                         with urllib.request.urlopen(f"http://{ip}:8080/api/status", timeout=1.0) as resp:
                             resp.read(64)
+                    except Exception:
+                        pass
+                    # Fallback de descubrimiento: si este nodo conoce al master
+                    # pero el master no recibe nuestro UDP, nos anunciamos por HTTP.
+                    try:
+                        with self.lock:
+                            master = self.is_master
+                        if not master and info.get("is_master"):
+                            payload = self.net.local_announcement(is_master=False)
+                            req = urllib.request.Request(
+                                f"http://{ip}:8080/api/register-peer",
+                                data=json.dumps(payload).encode("utf-8"),
+                                headers={"Content-Type": "application/json", "User-Agent": "adhoc-node/1.0"},
+                                method="POST",
+                            )
+                            with urllib.request.urlopen(req, timeout=1.0) as resp:
+                                resp.read(32)
                     except Exception:
                         pass
             except Exception:
