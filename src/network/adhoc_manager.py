@@ -273,7 +273,10 @@ class AdhocManager:
         nid = info.get("node_id")
         if not nid or nid == NODE_ID:
             return
-        peer_ip = info.get("ip") or addr_ip
+        # Preferir la IP real de la conexión HTTP. En IBSS a veces el payload
+        # trae una IP vieja/incorrecta, pero request.remote_addr es la ruta que
+        # acaba de funcionar hacia este peer.
+        peer_ip = addr_ip or info.get("ip")
         with self.lock:
             is_new = nid not in self.peers
             self.peers[nid] = {
@@ -290,6 +293,7 @@ class AdhocManager:
     def local_announcement(self, is_master: bool = False) -> Dict[str, Any]:
         payload = json.loads(self._heartbeat_payload(is_master=is_master).decode("utf-8"))
         payload["type"] = "peer_announce"
+        payload["announce_ts"] = time.time()
         return payload
 
     def detect_ip_conflicts(self) -> list:

@@ -94,6 +94,7 @@ class NodeDaemon:
         self.client_restart_pending = False
         self.last_peer_seen_time = time.time()
         self.last_forced_new_cell_time = 0.0
+        self.last_master_http_register = 0.0
         # Cache privado del master: (node_id, song) -> path descargado.
         # Solo se usa mientras ese peer siga conectado.
         self.peer_song_cache: dict[tuple[str, str], Path] = {}
@@ -198,7 +199,35 @@ class NodeDaemon:
         return False
 
     def _register_peer_http(self, data: dict, addr_ip: str = ""):
+        self.logger.info(
+            "Handshake HTTP recibido de peer=%s ip_http=%s ip_payload=%s master=%s",
+            data.get("node_id"), addr_ip, data.get("ip"), data.get("is_master"),
+        )
         self.net.register_peer(data, addr_ip=addr_ip)
+
+    def _announce_to_master_http(self, master_ip: str) -> bool:
+        """Handshake explícito cliente -> master por HTTP.
+
+        Si el cliente ve al master, el cliente se anuncia periódicamente. Esto
+        resuelve el caso asimétrico donde el master no recibe UDP del cliente.
+        """
+        if not master_ip or master_ip == "0.0.0.0":
+            return False
+        payload = self.net.local_announcement(is_master=False)
+        req = urllib.request.Request(
+            f"http://{master_ip}:8080/api/register-peer",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json", "User-Agent": "adhoc-node/1.0"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=1.5) as resp:
+                resp.read(64)
+            self.logger.info("Handshake HTTP enviado al master %s", master_ip)
+            return True
+        except Exception as e:
+            self.logger.debug("Handshake HTTP al master %s falló: %s", master_ip, e)
+            return False
 
     def force_song(self, song_name: str) -> bool:
         self.logger.info("Solicitando canción vía broadcast: %s", song_name)
@@ -457,19 +486,28 @@ class NodeDaemon:
                         with self.lock:
                             master = self.is_master
                         if not master and info.get("is_master"):
-                            payload = self.net.local_announcement(is_master=False)
-                            req = urllib.request.Request(
-                                f"http://{ip}:8080/api/register-peer",
-                                data=json.dumps(payload).encode("utf-8"),
-                                headers={"Content-Type": "application/json", "User-Agent": "adhoc-node/1.0"},
-                                method="POST",
-                            )
-                            with urllib.request.urlopen(req, timeout=1.0) as resp:
-                                resp.read(32)
+                            self._announce_to_master_http(ip)
                     except Exception:
                         pass
             except Exception:
                 self.logger.debug("Keepalive de conectividad falló", exc_info=True)
+
+    def _master_registration_loop(self):
+        """Handshake periódico: si soy cliente y veo master, me registro."""
+        while True:
+            time.sleep(3)
+            try:
+                with self.lock:
+                    master = self.is_master
+                if master:
+                    continue
+                peers = self.net.get_peers_snapshot()
+                for info in peers.values():
+                    if info.get("is_master"):
+                        self._announce_to_master_http(info.get("ip", ""))
+                        break
+            except Exception:
+                self.logger.debug("Error en master_registration_loop", exc_info=True)
 
     def _isolation_loop(self):
         """Si queda aislado >30s, crea celda IBSS propia y se vuelve master."""
@@ -629,6 +667,7 @@ class NodeDaemon:
             threading.Thread(target=self._ip_conflict_loop,  daemon=True, name="ip-conflict"),
             threading.Thread(target=self._state_persist_loop,daemon=True, name="state-persist"),
             threading.Thread(target=self._connectivity_keepalive_loop, daemon=True, name="connectivity-keepalive"),
+            threading.Thread(target=self._master_registration_loop, daemon=True, name="master-registration"),
             threading.Thread(target=self._isolation_loop,    daemon=True, name="isolation"),
             threading.Thread(target=self._rejoin_loop,       daemon=True, name="rejoin"),
             threading.Thread(target=self._master_logic,      daemon=True, name="master-logic"),
