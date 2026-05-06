@@ -96,13 +96,10 @@ yt-dlp -U || true
 echo "[+] Descargando 25 canciones de reggaeton (No Copyright) vía yt-dlp..."
 bash "$INSTALL_ROOT/repo/scripts/download-music.sh" "$INSTALL_ROOT/music"
 
-# ─── 6. Servicios systemd ──────────────────────────────────────────────────
-echo "[+] Registrando servicios systemd..."
-cp "$INSTALL_ROOT/repo/systemd/"*.service /etc/systemd/system/
-sed -i "s/ADHOC_IFACE=wlan0/ADHOC_IFACE=${IFACE}/" /etc/systemd/system/adhoc-node.service
-systemctl daemon-reload
-# Modo manual: no iniciar automáticamente con el sistema.
-systemctl disable adhoc-node.service 2>/dev/null || true
+# ─── 6. Servicio systemd ───────────────────────────────────────────────────
+# Fedora queda en modo 100% manual: el instalador NO registra ni habilita el
+# servicio. Si se quiere usar systemd, ejecutar scripts/install-service.sh.
+echo "[+] Saltando registro de systemd (modo manual)."
 
 # ─── 7. SELinux (permitir que el daemon manipule red y escriba logs) ──────
 if command -v setenforce >/dev/null 2>&1 && getenforce | grep -q Enforcing; then
@@ -133,11 +130,12 @@ echo "    Música: $INSTALL_ROOT/music/"
 echo "    Venv:   $VENV/"
 echo ""
 echo "    SELinux:   contexto aplicado a $INSTALL_ROOT"
-echo "    Firewalld: puertos 8080/tcp, 5004/udp, 5005/udp abiertos"
+echo "    Firewalld: desactivado para no bloquear peers AD-HOC"
 echo ""
 echo "    INTERNET no fue modificado. Usa los siguientes scripts para ON/OFF:"
 echo "    Activar AD-HOC:    sudo $SCRIPT_DIR/adhoc-on.sh"
 echo "    Restaurar internet: sudo $SCRIPT_DIR/adhoc-off.sh"
-echo "    Arrancar daemon:    sudo systemctl start adhoc-node.service"
+echo "    Arrancar daemon:    sudo $SCRIPT_DIR/start-node.sh"
+echo "    Instalar servicio:  sudo $SCRIPT_DIR/install-service.sh"
 echo "    Ver logs:           sudo journalctl -u adhoc-node.service -f"
 echo "    Dashboard:          http://<ip-nodo>:8080"

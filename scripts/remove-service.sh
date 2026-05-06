@@ -30,4 +30,3 @@ systemctl daemon-reload
 systemctl reset-failed "$SERVICE" 2>/dev/null || true
 
 echo "[+] Servicio eliminado."
-echo "    Para reinstalarlo: sudo ./scripts/install.sh  o  sudo ./scripts/install-fedora.sh"

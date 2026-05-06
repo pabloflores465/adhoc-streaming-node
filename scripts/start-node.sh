@@ -3,6 +3,11 @@
 # Uso: sudo ./scripts/start-node.sh
 set -euo pipefail
 
+if [ ! -f /etc/systemd/system/adhoc-node.service ]; then
+    echo "[i] Servicio no registrado; instalándolo en modo manual..."
+    "$(dirname "$0")/install-service.sh"
+fi
+
 systemctl daemon-reload
 systemctl start adhoc-node.service
 
