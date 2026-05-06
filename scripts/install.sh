@@ -46,7 +46,8 @@ bash "$INSTALL_ROOT/repo/scripts/download-music.sh" "$INSTALL_ROOT/music"
 echo "[+] Registrando servicios systemd..."
 cp "$INSTALL_ROOT/repo/systemd/"*.service /etc/systemd/system/
 systemctl daemon-reload
-systemctl enable adhoc-node.service
+# Modo manual: no iniciar automáticamente con el sistema.
+systemctl disable adhoc-node.service 2>/dev/null || true
 
 # ─── 6. Permisos ─────────────────────────────────────────────────────────────
 chmod -R 755 "$INSTALL_ROOT/repo/scripts/"*.sh

@@ -101,7 +101,8 @@ echo "[+] Registrando servicios systemd..."
 cp "$INSTALL_ROOT/repo/systemd/"*.service /etc/systemd/system/
 sed -i "s/ADHOC_IFACE=wlan0/ADHOC_IFACE=${IFACE}/" /etc/systemd/system/adhoc-node.service
 systemctl daemon-reload
-systemctl enable adhoc-node.service
+# Modo manual: no iniciar automáticamente con el sistema.
+systemctl disable adhoc-node.service 2>/dev/null || true
 
 # ─── 7. SELinux (permitir que el daemon manipule red y escriba logs) ──────
 if command -v setenforce >/dev/null 2>&1 && getenforce | grep -q Enforcing; then
