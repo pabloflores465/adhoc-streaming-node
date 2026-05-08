@@ -672,8 +672,33 @@ class NodeDaemon:
                             self.client_restart_pending = True
                             continue
 
-                # Actualizar estado de master
-                master_now = forced_master or self.net.am_i_master()
+                # Actualizar estado de master con estabilidad.
+                # Importante: si un cliente pierde heartbeats durante el stream,
+                # NO debe autoproclamarse master de inmediato porque corta la
+                # reproducción. Solo la isolation_loop crea nueva celda/master
+                # tras ADHOC_ISOLATION_NEW_CELL_AFTER segundos sin peers.
+                peers_for_election = self.net.get_peers_snapshot()
+                with self.lock:
+                    was_master = self.is_master
+                    isolated_for = time.time() - self.last_peer_seen_time
+
+                if forced_master:
+                    master_now = True
+                elif peers_for_election:
+                    master_now = self.net.am_i_master()
+                elif was_master:
+                    # El master conserva su rol aunque temporalmente no vea clientes.
+                    master_now = True
+                else:
+                    # Cliente aislado temporalmente: seguir como cliente hasta que
+                    # isolation_loop cree celda nueva después de 30s.
+                    if isolated_for > 8:
+                        self.logger.info(
+                            "Sin peers por %.1fs; manteniendo rol cliente hasta aislamiento %.0fs",
+                            isolated_for, ISOLATION_NEW_CELL_AFTER,
+                        )
+                    master_now = False
+
                 with self.lock:
                     became_master = master_now and not self.is_master
                     lost_master = not master_now and self.is_master
